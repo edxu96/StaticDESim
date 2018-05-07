@@ -1,8 +1,6 @@
 # Optimization_GreenEnergyIsland
 Title: Integration and Multi-objective Optimization of Green Energy Island based on Artificial Intelligence
-
 Version: Edward Xu, 7th May, 2018, Chongqing University, China.
-
 
 Hi, everyone, my name is Edward Xu. This is my undergraduate project. Welcome you to look at it and discuss with me.
 
