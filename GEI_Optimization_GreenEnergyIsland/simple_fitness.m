@@ -1,7 +1,7 @@
 % Title: Thermo-economic Optimization of Distributed Energy System in Green Energy Island.
 % Based on the theory of nolinear equality and inequality constraints.
 % Method: Genetic Algorithm within MATLAB Global Optimization Toolbox.
-% Version: 1.1, 2018.5.27, Jie Xu.
+% Version: 1.2, 2018.5.27, Jie Xu.
 % SubTitle: Define Objective Function.
 % 1. Micro Gas Turbine (MGT)
 % 2. Aqueous Lithium-Bromine Single-Effect Absorption Chiller (AC_ALB)
@@ -60,12 +60,12 @@ DELTA_p_E = 100 * 1000;                           % Pa, Pressure drop in evapora
 
 OMEGA_R123 = 0.281922497036;                      % Acentric Factor, R123.
 KAPPA_R123 = 0.37464 + (1.54226 - ...             % Dependent on OMEGA(working substance),
-        0.26992 * OMEGA_R123) * OMEGA_R123;       % Temperature-independent parameter in PR-EOS
+        0.26992 * OMEGA_R123) * OMEGA_R123;       % Temp-independent parameter in PR-EOS
 a_TcR123 = 0.457235529 * (R_gR123 * ...
            T_cR123)^2 ./ p_cR123;                 % Critical Point Restriction "a(T_c)"
 b_R123 = 0.077796074 * R_gR123 * ...
          T_cR123 ./ p_cR123;                      % m^3/mol, Critical Point Restriction "b",
-                                                  % Temperature-independent parameter in PR-EOS
+                                                  % Temp-independent parameter in PR-EOS
 
 %% 3. Pre-defined Condition. ----------------------------------------------------------------------------
 N = 8000;                                         % Operating Hours in Unit Years
@@ -146,7 +146,7 @@ m_AC3 = m_AC2; y_3 = y_2;
 m_AC4 = m_AC3 * y_3 / y_4;
 T_4wC = CoolProp.PropsSI('T', 'P', p_AC4, 'Q', 0, 'water') - 273.15;
 T_AC4 = T_4wC * (a0 + a1 * (y_4*100) + a2 * (y_4*100)^2 + a3 * (y_4*100)^3) + ...
-      b0 + b1 * (y_4*100) + b2 * (y_4*100)^2 + b3 * (y_4*100)^3 + 273.15;
+        b0 + b1 * (y_4*100) + b2 * (y_4*100)^2 + b3 * (y_4*100)^3 + 273.15;
 y_4str = num2str(y_4);
 s_AC4 = CoolProp.PropsSI('S', 'T', T_AC4, 'Q', 0, strcat('INCOMP::LiBr[',y_4str,']'));
 h_AC4 = CoolProp.PropsSI('H', 'T', T_AC4, 'Q', 0, strcat('INCOMP::LiBr[',y_4str,']'));
@@ -190,7 +190,7 @@ p_AC7 = p_H;
 % This is a standard assumption that represents the best possible case.
 T_3wC = CoolProp.PropsSI('T', 'P', p_AC3, 'Q', 0, 'water') - 273.15;
 T_3sat = T_3wC * (a0 + a1 * (y_3*100) + a2 * (y_3*100)^2 + a3 * (y_3*100)^3) + ...
-      b0 + b1 * (y_3*100) + b2 * (y_3*100)^2 + b3 * (y_3*100)^3 + 273.15;
+         b0 + b1 * (y_3*100) + b2 * (y_3*100)^2 + b3 * (y_3*100)^3 + 273.15;
 T_AC7 = T_3sat;
 h_AC7 = CoolProp.PropsSI('H', 'P', p_AC7, 'T', T_AC7, 'water');
 s_AC7 = CoolProp.PropsSI('S', 'P', p_AC7, 'T', T_AC7, 'water');
@@ -211,8 +211,12 @@ C_Ad = Z_A * A_d;
 
 %%  5.3 Mathematical Model of R123 Organic Rankine Cycle (ORC_R123) -------------------------------------
 % 5.3.1 Status 1, 1-2 Pump
-D_ORC1 = CoolProp.PropsSI('D', 'T', T_ORC1, 'Q', 0, 'R123');
-v_ORC1 = 1 / D_ORC1;
+Af = 4.643358E2; Bf =  1.625985E3; Cf = -1.333543E3;
+Df = 1.986142E3; Ef = -7.172430E2;
+T_rORC1 = T_ORC1 ./ T_cR123;                                          % Reduced Temerature
+D_ORC1 = Af + Bf * (1-T_rORC1).^(1/3) + Cf * (1-T_rORC1).^(2/3) + ...
+         Df * (1-T_rORC1) + Ef - (1-T_rORC1).^(4/3);
+v_ORC1 = D_ORC1 / 1;
 p_ORC1 = CoolProp.PropsSI('P', 'T', T_ORC1, 'Q', 0, 'R123');
 s_ORC1 = CoolProp.PropsSI('S', 'T', T_ORC1, 'Q', 0, 'R123');
 h_ORC1 = CoolProp.PropsSI('H', 'T', T_ORC1, 'Q', 0, 'R123');
