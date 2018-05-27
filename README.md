@@ -1,9 +1,9 @@
 # Optimization_GreenEnergyIsland
 Title: Integration and Multi-objective Optimization of Green Energy Island using Genetic Algorithm
 
-Version: Edward Xu, 7th May, 2018, Chongqing University, China.
+Version: Edward Xu, 27th May, 2018, Chongqing University, China.
 
-Hi, everyone, my name is Edward Xu. This is my undergraduate project. Welcome you to look at it and discuss with me.
+Hi, everyone, my name is Edward Xu. You can also call me Jie Xu, which is my primitive name. This is my undergraduate project. Welcome you to look at it and discuss with me.
 
 I am currently studying sustainable energy in Chongqing University, but I am going to Denmark Technical University to continue my graduate program - energy system analysis. I would like to share with you my learning.
 
