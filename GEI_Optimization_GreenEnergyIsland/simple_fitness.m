@@ -1,8 +1,11 @@
 % Title: Thermo-economic Optimization of Distributed Energy System in Green Energy Island.
 % Based on the theory of nolinear equality and inequality constraints.
 % Method: Genetic Algorithm within MATLAB Global Optimization Toolbox.
-% Version: 1.0, 2018.5.27, Jie Xu.
+% Version: 1.1, 2018.5.27, Jie Xu.
 % SubTitle: Define Objective Function.
+% 1. Micro Gas Turbine (MGT)
+% 2. Aqueous Lithium-Bromine Single-Effect Absorption Chiller (AC_ALB)
+% 3. R123 Organic Recycle Cycle (ORC_R123)
 
 function f = simple_fitness(x)
 
@@ -40,11 +43,11 @@ Z_A = ???;                                        % RMB / m2, Cost rate of area 
 Z_W = ???;                                        % RMB / kg, Cost rate of cooling water.
 Z_C = ???;                                        % RMB / J / s, Profit rate of supplying cooling load.
 Z_E = ???;                                        % RMB / J / s, Cost of supplying electricity for pump.
-% 1.3 Constants for ORC_R134a.
-R_G = 0.0815 * 1000;                              % J/(mol*K), Gas Constant
-M = 102.03;
-T_c = 374.23;                                     % K
-p_c = 4060.3 * 1000;                              % Pa
+% 1.3 Constants for ORC_R123.
+R_gR123 = 0.0544 * 1000;                          % J/(mol*K), Gas Constant.
+M_R123 = 152.93 / 1000;                           % kg/mol, Molecular Weight of R123.
+T_cR123 = 456.83;                                 % K, Critical Temp of R123.
+p_cR123 = 3668.0 * 1000;                          % Pa, Critical Pressure of R123.
 T_Cin = 25 + 273.15;                              % K, Inlet temperature of cold source.
 ETA_ps = 0.9;                                     % Isentropic efficiency of pump.
 ETA_ts = 0.9;                                     % Isentropic efficiency of turbine.
@@ -55,11 +58,13 @@ ETA_c = 0.9;                                      % Efficiency of condenser.
 DELTA_p_C = 100 * 1000;                           % Pa, Pressure drop in condenser.
 DELTA_p_E = 100 * 1000;                           % Pa, Pressure drop in evaporator.
 
-OMEGA = 0.32684;                                  % Acentric Factor, R134a.
-KAPPA = 0.37464 + ...                             % Dependent on OMEGA(working substance),
-        (1.54226 - 0.26992 * OMEGA) * OMEGA;      % Temperature-independent parameter in PR-EOS
-a_Tc = 0.457235529 * (R_G * T_c)^2 ./ p_c;        % Critical Point Restriction "a(T_c)"
-b = 0.077796074 * R_G * T_c ./ p_c;               % m^3/mol, Critical Point Restriction "b",
+OMEGA_R123 = 0.281922497036;                      % Acentric Factor, R123.
+KAPPA_R123 = 0.37464 + (1.54226 - ...             % Dependent on OMEGA(working substance),
+        0.26992 * OMEGA_R123) * OMEGA_R123;       % Temperature-independent parameter in PR-EOS
+a_TcR123 = 0.457235529 * (R_gR123 * ...
+           T_cR123)^2 ./ p_cR123;                 % Critical Point Restriction "a(T_c)"
+b_R123 = 0.077796074 * R_gR123 * ...
+         T_cR123 ./ p_cR123;                      % m^3/mol, Critical Point Restriction "b",
                                                   % Temperature-independent parameter in PR-EOS
 
 %% 3. Pre-defined Condition. ----------------------------------------------------------------------------
@@ -191,69 +196,72 @@ h_AC7 = CoolProp.PropsSI('H', 'P', p_AC7, 'T', T_AC7, 'water');
 s_AC7 = CoolProp.PropsSI('S', 'P', p_AC7, 'T', T_AC7, 'water');
 Q_d = m_AC4 * h_AC4 + m_AC7 * h_AC7 + m_AC3 * h_AC3;
 Q_a = m_AC1 * h_AC1 + m_AC10 * h_AC10 + m_AC6 * h_AC6;
-% Area of heat exchanger in desorber A_d.
+% Area of heat exchanger in desorber A_d.             ???
 T_AC11 = T_7;                                         % Temp of High Temp Smoke from MGT.
 Q_d = m_AC4 * h_AC4 + m_AC7 * h_AC7 - m_AC3 * h_AC3;  % W, HT Rate of heat exchanger in desorber
-m_d = m_g;                                            % Fluid Rate of High Temp Smoke from MGT.
-syms T_AC12 A_d
+syms T_AC12 A_d DELTA_T_d
 eq_d(1) = DELTA_T_d == ((T_AC11 - T_AC4) - (T_AC12 - T_AC3)) / log((T_AC11 - T_AC4) / (T_AC12 - T_AC3));
 eq_d(2) = Q_d == DELTA_T_d * K * A_d;
-[ST_AC12 SA_d] = solve(eq_d);
-T_AC12 = double(ST_AC12);
-A_d = double(SA_d);
+eq_d(3) = Q_d == c_pg * m_g * (T_AC11 - T_AC12);
+[ST_AC12, SA_d, SDELTA_T_d] = solve(eq_d);
+   T_AC12 = double(ST_AC12);
+      A_d = double(SA_d);
+DELTA_T_d = double(SDELTA_T_d);
 C_Ad = Z_A * A_d;
-%%  5.3 Mathematical Model of Vapor Compression Chiller - R134a (VCC_R134a) -----------------------------
+
+%%  5.3 Mathematical Model of R123 Organic Rankine Cycle (ORC_R123) -------------------------------------
 % 5.3.1 Status 1, 1-2 Pump
-D_ORC1 = CoolProp.PropsSI('D', 'T', T_ORC1, 'Q', 0, 'R134a');
+D_ORC1 = CoolProp.PropsSI('D', 'T', T_ORC1, 'Q', 0, 'R123');
 v_ORC1 = 1 / D_ORC1;
-p_ORC1 = CoolProp.PropsSI('P', 'T', T_ORC1, 'Q', 0, 'R134a');
-s_ORC1 = CoolProp.PropsSI('S', 'T', T_ORC1, 'Q', 0, 'R134a');
-h_ORC1 = CoolProp.PropsSI('H', 'T', T_ORC1, 'Q', 0, 'R134a');
+p_ORC1 = CoolProp.PropsSI('P', 'T', T_ORC1, 'Q', 0, 'R123');
+s_ORC1 = CoolProp.PropsSI('S', 'T', T_ORC1, 'Q', 0, 'R123');
+h_ORC1 = CoolProp.PropsSI('H', 'T', T_ORC1, 'Q', 0, 'R123');
 %% 5.3.2 Status 2, 2-3 Evaporator
 h_ORC2 = h_ORC1 + v_ORC1 * (p_ORC2 - p_ORC1);
-T_ORC2 = CoolProp.PropsSI('T', 'H', h_ORC2, 'P', p_ORC2, 'R134a');
+T_ORC2 = CoolProp.PropsSI('T', 'H', h_ORC2, 'P', p_ORC2, 'R123');
 s_ORC2 = s_ORC1 / ETA_ps;                                             % ???
 %% 5.3.3 Status 3, 3-4 Gas Turbine
 syms v_3sym
 p_ORC3 = p_ORC2;
-T_r3 = T_ORC3 ./ T_c;                             % Reduced Temerature
-ALPHASqrt3 = 1 + KAPPA * (1 - sqrt(T_r3));
-ALPHA3 = ALPHASqrt3^2;                            % Temp-dependent parameter in PR-EOS
-a_T3 = a_Tc * ALPHA3;                             % Temp-dependent parameter in PR-EOS, on equation
-Sv_3sym = solve(p_ORC3 == R*T_ORC3 / (v_3sym-b) - a_T3 / (v_3sym*(v_3sym+b) + b*(v_3sym-b)));
+T_r3 = T_ORC3 ./ T_cR123;                             % Reduced Temerature
+ALPHASqrt3 = 1 + KAPPA_R123 * (1 - sqrt(T_r3));
+ALPHA3 = ALPHASqrt3^2;                                % Temp-dependent parameter in PR-EOS
+a_T3 = a_TcR123 * ALPHA3;                             % Temp-dependent parameter in PR-EOS, on equation
+Sv_3sym = solve(p_ORC3 == R*T_ORC3 / (v_3sym-b_R123) - a_T3 / (v_3sym*(v_3sym+b_R123) + b_R123*(v_3sym-b_R123)));
 v_ORC3 = double(Sv_3sym);
-s_ORC3 = CoolProp.PropsSI('S', 'T', T_ORC3, 'P', p_ORC3, 'R134a');
-h_ORC3 = CoolProp.PropsSI('H', 'T', T_ORC3, 'P', p_ORC3, 'R134a');
+s_ORC3 = CoolProp.PropsSI('S', 'T', T_ORC3, 'P', p_ORC3, 'R123');
+h_ORC3 = CoolProp.PropsSI('H', 'T', T_ORC3, 'P', p_ORC3, 'R123');
 %% 5.3.4 Status 4, 4-1 Condenser
 p_ORC4 = p_ORC1;
 syms T_4sym
-A =  4.069889;   B = -2.362540E3;  C = 1.306883E1;
-D = 7.616005E-3; E =  2.342564E-1; F = 3.761111E2;
+A =  1.656333E3; B = -2.480583E6; C = 1.792522E1;
+D = -8.868380E2; E =  4.617861E2; F = 1.666667E3;
 ST_4sym = solve(log10(p_ORC4./1000) == A + B./T_4sym + C * log10(T_4sym) + D * T_4sym + ...
                                        E * ((F-T_4sym)./T_4sym) * log10(F-T_4sym)) + 273.15;
 T_ORC4 = double(ST_4sym);
 T_ORC4 = T_ORC4(imag(T_ORC4)==0);
 syms v_4sym
-T_r4 = T_ORC4 ./ T_c;                             % Reduced Temerature
-ALPHASqrt4 = 1 + KAPPA * (1 - sqrt(T_r4));
-ALPHA4 = ALPHASqrt4^2;                            % Temp-dependent parameter in PR-EOS
-a_T4 = a_Tc * ALPHA4;                             % Temp-dependent parameter in PR-EOS, on equation
-Sv_4sym = solve(p_ORC4 == R*T_ORC4 / (v_4sym-b) - a_T4 / (v_4sym*(v_4sym+b) + b*(v_4sym-b)));
+T_r4 = T_ORC4 ./ T_cR123;                             % Reduced Temerature
+ALPHASqrt4 = 1 + KAPPA_R123 * (1 - sqrt(T_r4));
+ALPHA4 = ALPHASqrt4^2;                                % Temp-dependent parameter in PR-EOS
+a_T4 = a_TcR123 * ALPHA4;                             % Temp-dependent parameter in PR-EOS, on equation
+Sv_4sym = solve(p_ORC4 == R*T_ORC4 / (v_4sym-b_R123) - a_T4 / (v_4sym*(v_4sym+b_R123) + b_R123*(v_4sym-b_R123)));
 v_ORC4 = double(Sv_4sym);
 v_ORC4 = v_ORC4(imag(v_ORC4)==0);
 s_ORC4 = s_ORC3;
-h_ORC4 = CoolProp.PropsSI('H', 'T', T_ORC4, 'P', p_ORC4, 'R134a');
-% Area of Heat Exchange in Evaporator within ORC_R134a.
+h_ORC4 = CoolProp.PropsSI('H', 'T', T_ORC4, 'P', p_ORC4, 'R123');
+% Area of Heat Exchange in Evaporator within ORC_R123.
 T_ORC19 = T_AC12;
 Q_ORC1 = m_ORC * (h_ORC3 - h_ORC2);
-m_ORC1 = m_g;
-syms T_ORC20 A_ORC1
-eq_ORC1(1) = DELTA_T_d == ((T_ORC19 - T_ORC3) - (T_ORC20 - T_ORC2)) / ...
+syms T_ORC20 A_ORC1 DELTA_T_ORC1
+eq_ORC1(1) = DELTA_T_ORC1 == ((T_ORC19 - T_ORC3) - (T_ORC20 - T_ORC2)) / ...
                           log((T_ORC19 - T_ORC3) / (T_ORC20 - T_ORC2));
 eq_ORC1(2) = Q_ORC1 == DELTA_T_ORC1 * K * A_ORC1;
-[ST_ORC20 SA_ORC1] = solve(eq_ORC1);
-T_ORC20 = double(ST_ORC20);
-A_ORC1 = double(SA_ORC1);
+eq_ORC1(3) = Q_ORC1 == m_g * c_pg * (T_ORC19 - T_ORC20);
+[ST_ORC20,SA_ORC1,SDELTA_T_ORC1] = solve(eq_ORC1);
+     T_ORC20 = double(ST_ORC20);
+      A_ORC1 = double(SA_ORC1);
+DELTA_T_ORC1 = double(SDELTA_T_ORC1);
 
 %% 6. Economic Model ------------------------------------------------------------------------------------
 %% 6.1 Economic Model of MGT.
@@ -298,8 +306,8 @@ C_Wa = Z_W * m_a * N * N_y;
 % Electricity required for pump
 W_ACp = m_AC1 * (h_AC2 - h_AC1);
 C_Ep = Z_E * W_ACp * N * N_y;
-%% 6.3 Economic Model of ORC_R134a.
-% Area of Heat Exchange in Condenser within ORC_R134a.
+%% 6.3 Economic Model of ORC_R123.
+% Area of Heat Exchange in Condenser within ORC_R123.
 T_ORC21 = T_0;
 T_ORC22 = T_0H;
 Q_ORC2 = m_ORC * (h_ORC4 - h_ORC1);
@@ -308,10 +316,10 @@ A_ORC2 = Q_ORC2 / DELTA_T_ORC2 / K;
 h_ORC21 = CoolProp.PropsSI('H', 'T', T_ORC21, 'P', p_0, 'water');
 h_ORC22 = CoolProp.PropsSI('H', 'T', T_ORC22, 'P', p_0, 'water');
 m_ORC2 = Q_ORC2 / (h_ORC22 - h_ORC21);
-% Output Work of Gas Turbine in ORC.
+% Output Work of Gas Turbine in ORC_R123.
 W_ORC = m_ORC * (h_ORC3 - h_ORC4);
 C_E_ORC = W_ORC * ETA_G * Z_E * N * N_y;
-% Required Work of Pump in ORC.
+% Required Work of Pump in ORC_R123.
 W_ORCp = m_ORC * (h_ORC2 - h_ORC1);
 C_EpORC = Z_E * W_ORCp * N * N_y;
 C_ORC1 = A_ORC1 * Z_A; % Cost of area for heat exchange in evaporator.
