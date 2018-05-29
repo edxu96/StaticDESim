@@ -1,13 +1,35 @@
 % Title: Thermo-economic Optimization of Distributed Energy System in Green Energy Island.
 % Based on the theory of nolinear equality and inequality constraints.
 % Method: Genetic Algorithm within MATLAB Global Optimization Toolbox.
-% Version: 1.2, 2018.5.27, Jie Xu.
+% Version: 1.3, 2018.5.28, Jie Xu.
 % SubTitle: Define Objective Function.
 % 1. Micro Gas Turbine (MGT)
 % 2. Aqueous Lithium-Bromine Single-Effect Absorption Chiller (AC_ALB)
 % 3. R123 Organic Recycle Cycle (ORC_R123)
 
-function f = simple_fitness(x)
+clear; clc;
+
+% function f = simple_fitness(x)
+
+x(1) = 633186.25;
+x(2) = 0.837;
+x(3) = 0.917;
+x(4) = 769.395751953125;
+x(5) = 1300;
+x(6) = 0.03;
+x(7) = 60 * 1000;
+
+x(8) = 4 + 273.15;
+x(9) = 30 + 273.15;
+x(10) = 0.5322;
+x(11) = 0.6711;
+x(12) = 0.05;           %
+x(13) = 0.8;         %
+
+x(14) = 0.05;
+x(15) = 200 + 273.15;
+x(16) = 6 * 101.325 * 1000;
+x(17) = 80 + 273.15;
 
 %% 1. General Constants ---------------------------------------------------------------------------------
 R = 8.314472;                                     % J/(mol*K), Universial Gas Constant
@@ -38,11 +60,14 @@ c_pa = 1004;                                      % 空气比热容
 c_pg = 1170;                                      % 天然气比热容
 ETA_CC = 0.98877;
 % 1.2 Constants for AC_ALB
-K = ???;                                          % W / m2 / K, Thermal conductivity.
-Z_A = ???;                                        % RMB / m2, Cost rate of area of heat transfer.
-Z_W = ???;                                        % RMB / kg, Cost rate of cooling water.
-Z_C = ???;                                        % RMB / J / s, Profit rate of supplying cooling load.
-Z_E = ???;                                        % RMB / J / s, Cost of supplying electricity for pump.
+K = 1000;                                         % W / m^2 / K, Thermal conductivity.
+Z_A = 100;                                        % RMB / m^2, Cost rate of area of heat transfer.
+Z_W = 3.25E-3;                                    % RMB / kg, Cost rate of cooling water.
+Z_C = 0.5;                                        % RMB / kW*h, Profit rate of supplying cooling load.
+Z_E = 0.6;                                        % RMB / kW*h, Cost of supplying electricity for pump.
+Q_wAC = 44.1 * 1000;                              % W,   ????
+Z_wAC = 235550;                                   % RMB, ????
+ALPHA_wAC = 0.73;                                 %      ????
 % 1.3 Constants for ORC_R123.
 R_gR123 = 0.0544 * 1000;                          % J/(mol*K), Gas Constant.
 M_R123 = 152.93 / 1000;                           % kg/mol, Molecular Weight of R123.
@@ -57,59 +82,60 @@ ETA_e = 0.9;                                      % Efficiency of evaporator.
 ETA_c = 0.9;                                      % Efficiency of condenser.
 DELTA_p_C = 100 * 1000;                           % Pa, Pressure drop in condenser.
 DELTA_p_E = 100 * 1000;                           % Pa, Pressure drop in evaporator.
-
 OMEGA_R123 = 0.281922497036;                      % Acentric Factor, R123.
 KAPPA_R123 = 0.37464 + (1.54226 - ...             % Dependent on OMEGA(working substance),
         0.26992 * OMEGA_R123) * OMEGA_R123;       % Temp-independent parameter in PR-EOS
 a_TcR123 = 0.457235529 * (R_gR123 * ...
            T_cR123)^2 ./ p_cR123;                 % Critical Point Restriction "a(T_c)"
-b_R123 = 0.077796074 * R_gR123 * ...
-         T_cR123 ./ p_cR123;                      % m^3/mol, Critical Point Restriction "b",
-                                                  % Temp-independent parameter in PR-EOS
-
+b_R123 = 0.077796074 * R_gR123 * ...              % m^3/mol, Critical Point Restriction "b",
+         T_cR123 ./ p_cR123;                      % Temp-independent parameter in PR-EOS
+Q_wORC = 23.6 * 1000;                             % W,   ????
+Z_wORC = 385600;                                  % RMB, ????
+ALPHA_wORC = 0.73;                                %      ????
+ETA_G = 0.9;
 %% 3. Pre-defined Condition. ----------------------------------------------------------------------------
 N = 8000;                                         % Operating Hours in Unit Years
 N_y = 10;                                         % Unit Years
 
 %% 4. Decision Variables. -------------------------------------------------------------------------------
 % 4.1 Decision Variables in MGT.
-   p_2 = x(1);                  % Outlet Pressure of Air Compressor
-eta_AC = x(2);                  % Isentropic Efficiency of Air Compressor
-eta_GT = x(3);                  % Isentropic Efficiency of Gas Turbine
-   T_3 = x(4);                  % Outlet Temp of Air from Regenerator
-   T_4 = x(5);                  % Inlet Temp of Gas Turbine
-   m_s = x(6);                  % Fluid Rate of Saturated Steam from HRSG
-W_pMGT = x(7);                  % Net Power from Micro Gas Turbine
+      p_2 = x(1);               % Outlet Pressure of Air Compressor
+   eta_AC = x(2);               % Isentropic Efficiency of Air Compressor
+   eta_GT = x(3);               % Isentropic Efficiency of Gas Turbine
+      T_3 = x(4);               % Outlet Temp of Air from Regenerator
+      T_4 = x(5);               % Inlet Temp of Gas Turbine
+      m_s = x(6);               % Fluid Rate of Saturated Steam from HRSG
+   W_pMGT = x(7);               % Net Power from Micro Gas Turbine
 % 4.2 Decision Variables in AC_ALB.
    T_AC10 = x(8);               % K,    Outlet temperature of Evaporator.
     T_AC8 = x(9);               % K,    Outlet temperature of Condenser.
       y_1 = x(10);              %       Mass Fraction of Outlet Solution from Absorber.
       y_4 = x(11);              %       Mass Fraction of Outlet Solution from Desorber.
-      m_1 = x(12);              % kg/s, Fluid Rate Outlet Solution from Absorber.
+    m_AC1 = x(12);              % kg/s, Fluid Rate Outlet Solution from Absorber.
   ETA_shx = x(13);              % Solution Heat Exchanger Ratio.
-% 4.3 Decision Variables in ORC_R134a.
-  m_ORC = x(14);                % Fluid Rate.
-    T_3 = x(15);                % inlet temperature of turbine
-    p_2 = x(16);                % outlet pressure of pump / inlet pressure of turbine
-    T_1 = x(17);                % Outlet temperature of condenser.
+% 4.3 Decision Variables in ORC_R123.
+    m_ORC = x(14);              % Fluid Rate.
+   T_ORC3 = x(15);              % inlet temperature of turbine
+   p_ORC2 = x(16);              % outlet pressure of pump / inlet pressure of turbine
+   T_ORC1 = x(17);              % Outlet temperature of condenser.
 
 %% 5.1 Mathematical Model of Micro Gas Turbine (MGT) ----------------------------------------------------
 T_2 = T_1 .* (1 + 1./eta_AC * ...
-      ((p_2./p_1)^((K_a-1)./K_a) - 1));                      % (1)  AC
-p_3 = p_2 * (1 - DELTA_p_aRE);                               % (7)  RE
-p_4 = p_3 * (1 - DELTA_p_cc);                                % (5)  CC
-p_6 = p_7 ./ (1 - DELTA_p_HRSG);                             % (14) HRSG
-p_5 = p_6 ./ (1 - DELTA_p_gRE);                              % (8)  RE
-T_5 = T_4 * (1 - eta_GT * (1 - (p_4./p_5)^((1-K_g)./K_g)));  % (9)  GT
-H = (c_pg * T_4 - ETA_CC * LHV) ./ (c_pa * T_3 - ETA_CC * LHV);
-m_g = W_pMGT ./ (c_pg*(T_4-T_5) - c_pa*(T_2-T_1)*H);
-m_a = H * m_g;
-m_f = m_g - m_a;                                             % (3)  CC
-T_6 = T_5 - m_a * c_pa * (T_3 - T_2) ./ (m_g * c_pg);        % (6)  RE
-T_7p = T_6 - m_s * (h_9 - h_8p) ./ (m_g * c_pg);             % (12) HRSG
-T_7 = T_6 - m_s * (h_9 - h_8) ./ (m_g * c_pg);               % (13) HRSG
-W_AC = m_a * c_pa * (T_2 - T_1);                             % (2)  AC
-W_GT = W_pMGT + W_AC;                                        % (11) GT
+      ((p_2./p_1)^((K_a-1)./K_a) - 1));                         % (1)  AC
+p_3 = p_2 * (1 - DELTA_p_aRE);                                  % (7)  RE
+p_4 = p_3 * (1 - DELTA_p_cc);                                   % (5)  CC
+p_6 = p_7 ./ (1 - DELTA_p_HRSG);                                % (14) HRSG
+p_5 = p_6 ./ (1 - DELTA_p_gRE);                                 % (8)  RE
+T_5 = T_4 * (1 - eta_GT * (1 - (p_4./p_5)^((1-K_g)./K_g)));     % (9)  GT
+H = (c_pg * T_4 - ETA_CC * LHV) ./ (c_pa * T_3 - ETA_CC * LHV); % (4) CC, H = m_a / m_g;
+m_g = W_pMGT ./ (c_pg*(T_4-T_5) - c_pa*(T_2-T_1)*H);            % (2) (10)
+m_a = H * m_g;                                                  % H = m_a / m_g;
+m_f = m_g - m_a;                                                % (3)  CC
+T_6 = T_5 - m_a * c_pa * (T_3 - T_2) ./ (m_g * c_pg);           % (6)  RE
+T_7p = T_6 - m_s * (h_9 - h_8p) ./ (m_g * c_pg);                % (12) HRSG
+T_7 = T_6 - m_s * (h_9 - h_8) ./ (m_g * c_pg);                  % (13) HRSG
+W_AC = m_a * c_pa * (T_2 - T_1);                                % (2)  AC
+W_GT = W_pMGT + W_AC;                                           % (11) GT
 
 %% 5.2 Mathematical Model of Aqueous Lithium-Bromide Absorption Chiller (AC_ALB)-------------------------
 % 5.2.1 Status 10 of AC_ALB.
@@ -194,13 +220,13 @@ T_3sat = T_3wC * (a0 + a1 * (y_3*100) + a2 * (y_3*100)^2 + a3 * (y_3*100)^3) + .
 T_AC7 = T_3sat;
 h_AC7 = CoolProp.PropsSI('H', 'P', p_AC7, 'T', T_AC7, 'water');
 s_AC7 = CoolProp.PropsSI('S', 'P', p_AC7, 'T', T_AC7, 'water');
-Q_d = m_AC4 * h_AC4 + m_AC7 * h_AC7 + m_AC3 * h_AC3;
 Q_a = m_AC1 * h_AC1 + m_AC10 * h_AC10 + m_AC6 * h_AC6;
-% Area of heat exchanger in desorber A_d.             ???
+%% Area of heat exchanger in desorber A_d.             ???
 T_AC11 = T_7;                                         % Temp of High Temp Smoke from MGT.
-Q_d = m_AC4 * h_AC4 + m_AC7 * h_AC7 - m_AC3 * h_AC3;  % W, HT Rate of heat exchanger in desorber
+Q_d = m_AC4 * h_AC4 + m_AC7 * h_AC7 - m_AC3 * h_AC3;  % W, HT Rate in desorber
 syms T_AC12 A_d DELTA_T_d
-eq_d(1) = DELTA_T_d == ((T_AC11 - T_AC4) - (T_AC12 - T_AC3)) / log((T_AC11 - T_AC4) / (T_AC12 - T_AC3));
+eq_d(1) = DELTA_T_d == ((T_AC11 - T_AC4) - (T_AC12 - T_AC3)) ...
+                        / log((T_AC11 - T_AC4) / (T_AC12 - T_AC3));
 eq_d(2) = Q_d == DELTA_T_d * K * A_d;
 eq_d(3) = Q_d == c_pg * m_g * (T_AC11 - T_AC12);
 [ST_AC12, SA_d, SDELTA_T_d] = solve(eq_d);
@@ -217,12 +243,14 @@ T_rORC1 = T_ORC1 ./ T_cR123;                                          % Reduced 
 D_ORC1 = Af + Bf * (1-T_rORC1).^(1/3) + Cf * (1-T_rORC1).^(2/3) + ...
          Df * (1-T_rORC1) + Ef - (1-T_rORC1).^(4/3);
 v_ORC1 = D_ORC1 / 1;
+% p_ORC1 = 10 * CoolProp.PropsSI('P', 'T', T_ORC1, 'Q', 0, 'R123');
 p_ORC1 = CoolProp.PropsSI('P', 'T', T_ORC1, 'Q', 0, 'R123');
 s_ORC1 = CoolProp.PropsSI('S', 'T', T_ORC1, 'Q', 0, 'R123');
 h_ORC1 = CoolProp.PropsSI('H', 'T', T_ORC1, 'Q', 0, 'R123');
 %% 5.3.2 Status 2, 2-3 Evaporator
 h_ORC2 = h_ORC1 + v_ORC1 * (p_ORC2 - p_ORC1);
-T_ORC2 = CoolProp.PropsSI('T', 'H', h_ORC2, 'P', p_ORC2, 'R123');
+T_ORC2 = T_ORC1;                                    % ???
+% T_ORC2 = CoolProp.PropsSI('T', 'H', h_ORC2, 'P', p_ORC2, 'R123');
 s_ORC2 = s_ORC1 / ETA_ps;                                             % ???
 %% 5.3.3 Status 3, 3-4 Gas Turbine
 syms v_3sym
@@ -233,17 +261,21 @@ ALPHA3 = ALPHASqrt3^2;                                % Temp-dependent parameter
 a_T3 = a_TcR123 * ALPHA3;                             % Temp-dependent parameter in PR-EOS, on equation
 Sv_3sym = solve(p_ORC3 == R*T_ORC3 / (v_3sym-b_R123) - a_T3 / (v_3sym*(v_3sym+b_R123) + b_R123*(v_3sym-b_R123)));
 v_ORC3 = double(Sv_3sym);
+v_ORC3 = v_ORC3(imag(v_ORC3)==0);
 s_ORC3 = CoolProp.PropsSI('S', 'T', T_ORC3, 'P', p_ORC3, 'R123');
 h_ORC3 = CoolProp.PropsSI('H', 'T', T_ORC3, 'P', p_ORC3, 'R123');
 %% 5.3.4 Status 4, 4-1 Condenser
 p_ORC4 = p_ORC1;
+T_ORC4 = CoolProp.PropsSI('T', 'P', p_ORC4, 'Q', 1, 'R123');
+%{
 syms T_4sym
-A =  1.656333E3; B = -2.480583E6; C = 1.792522E1;
-D = -8.868380E2; E =  4.617861E2; F = 1.666667E3;
-ST_4sym = solve(log10(p_ORC4./1000) == A + B./T_4sym + C * log10(T_4sym) + D * T_4sym + ...
-                                       E * ((F-T_4sym)./T_4sym) * log10(F-T_4sym)) + 273.15;
+A =  1.656333E3;  B = -2.480583E6; C = 1.792522E1;
+D = -8.868380E-2; E =  4.617861E2; F = 1.666667E3;
+ST_4sym = solve(log10(p_ORC4/1000) == A + B/T_4sym + C * log10(T_4sym) + D * T_4sym + ...
+                                       E * ((F-T_4sym)/T_4sym) * log10(F-T_4sym));
 T_ORC4 = double(ST_4sym);
-T_ORC4 = T_ORC4(imag(T_ORC4)==0);
+T_ORC4 = real(T_ORC4);
+% T_ORC4 = T_ORC4(imag(T_ORC4)==0);
 syms v_4sym
 T_r4 = T_ORC4 ./ T_cR123;                             % Reduced Temerature
 ALPHASqrt4 = 1 + KAPPA_R123 * (1 - sqrt(T_r4));
@@ -252,9 +284,10 @@ a_T4 = a_TcR123 * ALPHA4;                             % Temp-dependent parameter
 Sv_4sym = solve(p_ORC4 == R*T_ORC4 / (v_4sym-b_R123) - a_T4 / (v_4sym*(v_4sym+b_R123) + b_R123*(v_4sym-b_R123)));
 v_ORC4 = double(Sv_4sym);
 v_ORC4 = v_ORC4(imag(v_ORC4)==0);
+%}
 s_ORC4 = s_ORC3;
-h_ORC4 = CoolProp.PropsSI('H', 'T', T_ORC4, 'P', p_ORC4, 'R123');
-% Area of Heat Exchange in Evaporator within ORC_R123.
+h_ORC4 = CoolProp.PropsSI('H', 'P', p_ORC4, 'Q', 1, 'R123');
+%% Area of Heat Exchange in Evaporator within ORC_R123.
 T_ORC19 = T_AC12;
 Q_ORC1 = m_ORC * (h_ORC3 - h_ORC2);
 syms T_ORC20 A_ORC1 DELTA_T_ORC1
@@ -275,14 +308,14 @@ z_MT = P * W_pMGT / 1000;                                  % 燃气轮机的购�
 Q_HRSG = (h_9 - h_8) * m_s;                                % 余热锅炉热负荷
 % z_HRSG = z_w * (Q_HRSG ./ Q_w)^ALPHA;                    % 余热锅炉购置费 ???
 z_HRSG = (Q_HRSG * 4.851)^ALPHA;                           % 余热锅炉购置费
-C_E_MGT = W_pMGT * ETA_G * Z_E * N * N_y;                  % Profit from Electricity generated by MGT.
+C_E_MGT = W_pMGT * ETA_G * Z_E * N * N_y * 1000;           % Profit from Electricity generated by MGT.
 %% 6.2 Economic Model of AC_ALB.
-% Area of heat exchanger in solution heat exchanger A_s.
+% Area of heat exchanger in solution heat exchanger A_s in AC_ALB.
 Q_s = m_AC2 * (h_AC3 - h_AC2);
 DELTA_T_s = ((T_AC4 - T_AC3) - (T_AC5 - T_AC2)) / log((T_AC4 - T_AC3) / (T_AC5 - T_AC2));
 A_s = Q_s / (DELTA_T_s * K);
 C_As = Z_A * A_s;
-% Area of heat exchanger in condenser A_c.
+% Area of heat exchanger in condenser A_c in AC_ALB.
 Q_c = m_AC7 * (h_AC7 - h_AC8);                             % W, HT Rate of heat exchanger in desorber
 T_AC15 = T_0;
 T_AC16 = T_0H;
@@ -292,11 +325,11 @@ h_AC15 = CoolProp.PropsSI('H', 'T', T_AC15, 'P', p_0, 'water');
 h_AC16 = CoolProp.PropsSI('H', 'T', T_AC16, 'P', p_0, 'water');
 m_c = Q_c / (h_AC16 - h_AC15);
 C_Ac = Z_A * A_c;
-C_Wc = Z_W * m_c * N * N_y;
-% Area of heat exchanger in evaporator A_e.
-Q_e = m_AC9 * (h_AC10 - h_AC9);
-C_Ce = Z_c * Q_e * N * N_y;                            % Profit of supplying cooling energy.
-% Area of heat exchanger in absorber A_a.
+C_Wc = Z_W * m_c * N * N_y * 3600;
+% Area of heat exchanger in evaporator A_e in AC_ALB.
+Q_e = m_AC9 * (h_AC10 - h_AC9);                        % W, Power of supplying cooling energy.
+C_Ce = Z_C * Q_e * N * N_y * 1000;                     % RMB, Profit of supplying cooling energy.
+% Area of heat exchanger in absorber A_a in AC_ALB.
 Q_a = m_AC10 * h_AC10 + m_AC6 * h_AC6 - m_AC1 * h_AC1; % W, HT rate of heat exchanger in desorber
 T_AC13 = T_0;
 T_AC14 = T_0H;
@@ -306,10 +339,10 @@ h_AC13 = CoolProp.PropsSI('H', 'T', T_AC13, 'P', p_0, 'water');
 h_AC14 = CoolProp.PropsSI('H', 'T', T_AC14, 'P', p_0, 'water');
 m_a = Q_a / (h_AC14 - h_AC13);
 C_Aa = Z_A * A_a;
-C_Wa = Z_W * m_a * N * N_y;
-% Electricity required for pump
-W_ACp = m_AC1 * (h_AC2 - h_AC1);
-C_Ep = Z_E * W_ACp * N * N_y;
+C_Wa = Z_W * m_a * N * N_y * 3600;
+W_ACp = m_AC1 * (h_AC2 - h_AC1);                        % W,   Electricity required for pump.
+C_Ep = Z_E * W_ACp * N * N_y * 1000;                    % RMB, Cost of electricity required for pump.
+z_AC = Q_e * (Q_wAC / Z_wAC)^ALPHA_wAC;                 % RMB, Estimated purchased price of AC_ALB.
 %% 6.3 Economic Model of ORC_R123.
 % Area of Heat Exchange in Condenser within ORC_R123.
 T_ORC21 = T_0;
@@ -319,20 +352,21 @@ DELTA_T_ORC2 = ((T_ORC4 - T_ORC22) - (T_ORC1 - T_ORC21)) / log((T_ORC4 - T_ORC22
 A_ORC2 = Q_ORC2 / DELTA_T_ORC2 / K;
 h_ORC21 = CoolProp.PropsSI('H', 'T', T_ORC21, 'P', p_0, 'water');
 h_ORC22 = CoolProp.PropsSI('H', 'T', T_ORC22, 'P', p_0, 'water');
-m_ORC2 = Q_ORC2 / (h_ORC22 - h_ORC21);
-% Output Work of Gas Turbine in ORC_R123.
-W_ORC = m_ORC * (h_ORC3 - h_ORC4);
-C_E_ORC = W_ORC * ETA_G * Z_E * N * N_y;
-% Required Work of Pump in ORC_R123.
-W_ORCp = m_ORC * (h_ORC2 - h_ORC1);
-C_EpORC = Z_E * W_ORCp * N * N_y;
-C_ORC1 = A_ORC1 * Z_A; % Cost of area for heat exchange in evaporator.
-C_ORC2 = A_ORC2 * Z_A; % Cost of area for heat exchange in evaporator.
-C_ORCw = m_ORC2 * Z_W; % Cost of supplying cooling water.
+m_ORC2 = Q_ORC2 / (h_ORC22 - h_ORC21);                   % kg/s, Amount of supplying cooling water.
+W_ORC = m_ORC * (h_ORC3 - h_ORC4);                       % W,    Output work of ORC_R123.
+C_E_ORC = W_ORC * ETA_G * Z_E * N * N_y * 1000;          % RMB,  Profit of output work of ORC_R123.
+W_ORCp = m_ORC * (h_ORC2 - h_ORC1);                      % W,    Required Work of Pump in ORC_R123.
+C_EpORC = Z_E * W_ORCp * N * N_y * 1000;                 % RMB,  Cost of required Work of Pump in ORC_R123.
+C_ORC1 = A_ORC1 * Z_A;                                   % RMB,  Cost of area for heat exchange in evaporator.
+C_ORC2 = A_ORC2 * Z_A;                                   % RMB,  Cost of area for heat exchange in evaporator.
+C_ORCw = m_ORC2 * Z_W;                                   % RMB,  Cost of supplying cooling water.
+z_ORC = Z_wORC * (W_ORC / Q_wORC)^ALPHA_wORC;            % RMB,  Non-energy cost of ORC_R123. ??????
 
 %% 5. Define Objective Function -------------------------------------------------------------------------
-f = 1000000 - c_f * m_f * LHV + CRF * phi * (z_MT + z_HRSG) ./ (3600 * N) + C_E_MGT + ... % MGT Objective
-    1000000 - (C_As + C_Ad + C_Wc + C_Ac + C_Wa + C_Aa) - C_Ep + C_Ce + ...            % AC_ALB Objective
-    1000000 - (C_ORC1 + C_ORC2 + C_ORCw) + C_E_ORC;                                 % ORC_R134a Objective
+f = 1000000 - c_f * m_f * LHV - CRF * phi * (z_MT + z_HRSG) / (3600 * N) + C_E_MGT + ... % MGT Objective
+    500000 - CRF * phi * z_AC / (3600 * N) + ...                                    % AC_ALB Objective 1
+    500000 - (C_As + C_Ad + C_Wc + C_Ac + C_Wa + C_Aa) - C_Ep + C_Ce + ...          % AC_ALB Objective 2
+    500000 - CRF * phi * z_ORC / (3600 * N) + ...                                 % ORC_R123 Objective 1
+    500000 - (C_ORC1 + C_ORC2 + C_ORCw + C_EpORC) + C_E_ORC;                      % ORC_R123 Objective 2
 
-end
+% end
