@@ -1,7 +1,7 @@
 % Title: Thermo-economic Optimization of Distributed Energy System in Green Energy Island.
 % Based on the theory of nolinear equality and inequality constraints.
 % Method: Genetic Algorithm within MATLAB Global Optimization Toolbox.
-% Version: 1.3, 2018.5.28, Jie Xu.
+% Version: 1.4, 2018.6.1, Jie Xu.
 % SubTitle: Define Objective Function.
 % 1. Micro Gas Turbine (MGT)
 % 2. Aqueous Lithium-Bromine Single-Effect Absorption Chiller (AC_ALB)
@@ -38,7 +38,7 @@ p_ref = 101.325 * 1000;                           % Pa , Pressure in Reference S
 p_0 = 101.325 * 1000;                             % Pa, Pressure of atmosphere.
 T_0 = 25 + 273.15;                                % K, Temperature of atmosphere.
 T_0H = 35 + 273.15;                               % K, Acceptable Highest Temp of atmosphere.
-
+T_0L = 15 + 273.15;                               % K, Acceptable Lowest Temp of atmosphere.
 % 1.1 Constants for MGT
 LHV = 500000 * 1000;                              % 纯甲烷燃料的低热值
 DELTA_p_cc = 0.05; DELTA_p_aRE = 0.05; ...
@@ -63,7 +63,7 @@ ETA_CC = 0.98877;
 K = 1000;                                         % W / m^2 / K, Thermal conductivity.
 Z_A = 100;                                        % RMB / m^2, Cost rate of area of heat transfer.
 Z_W = 3.25E-3;                                    % RMB / kg, Cost rate of cooling water.
-Z_C = 0.5;                                        % RMB / kW*h, Profit rate of supplying cooling load.
+Z_cw = 0.5;                                       % RMB / kW*h, Profit rate of supplying cooling load.
 Z_E = 0.6;                                        % RMB / kW*h, Cost of supplying electricity for pump.
 Q_wAC = 44.1 * 1000;                              % W,   ????
 Z_wAC = 235550;                                   % RMB, ????
@@ -96,7 +96,12 @@ ETA_G = 0.9;
 %% 3. Pre-defined Condition. ----------------------------------------------------------------------------
 N = 8000;                                         % Operating Hours in Unit Years
 N_y = 10;                                         % Unit Years
-
+T_s = T_9; p_s = p_9;                             % Supplying steam.
+T_cw = 4 + 273.15; p_cw = p_0;                    % Supplying cooling water.
+%% Constants after Calculation.
+h_0 = CoolProp.PropsSI('H', 'T', T_0, 'P', p_0, 'water');
+h_s = CoolProp.PropsSI('H', 'T', T_s, 'P', p_s, 'water');
+h_cw = CoolProp.PropsSI('H', 'T', T_cw, 'P', p_cw, 'water');
 %% 4. Decision Variables. -------------------------------------------------------------------------------
 % 4.1 Decision Variables in MGT.
       p_2 = x(1);               % Outlet Pressure of Air Compressor
@@ -118,6 +123,7 @@ N_y = 10;                                         % Unit Years
    T_ORC3 = x(15);              % inlet temperature of turbine
    p_ORC2 = x(16);              % outlet pressure of pump / inlet pressure of turbine
    T_ORC1 = x(17);              % Outlet temperature of condenser.
+
 
 %% 5.1 Mathematical Model of Micro Gas Turbine (MGT) ----------------------------------------------------
 T_2 = T_1 .* (1 + 1./eta_AC * ...
@@ -223,15 +229,15 @@ s_AC7 = CoolProp.PropsSI('S', 'P', p_AC7, 'T', T_AC7, 'water');
 %% Area of heat exchanger in desorber A_d.             ???
 T_AC11 = T_7;                                         % Temp of High Temp Smoke from MGT.
 Q_d = m_AC4 * h_AC4 + m_AC7 * h_AC7 - m_AC3 * h_AC3;  % W, HT Rate in desorber
-syms T_AC12 A_d DELTA_T_d
-eq_d(1) = DELTA_T_d == ((T_AC11 - T_AC4) - (T_AC12 - T_AC3)) ...
+syms T_AC12 A_d DeltaT_ACd
+eq_d(1) = DeltaT_ACd == ((T_AC11 - T_AC4) - (T_AC12 - T_AC3)) ...
                         / log((T_AC11 - T_AC4) / (T_AC12 - T_AC3));
-eq_d(2) = Q_d == DELTA_T_d * K * A_d;
+eq_d(2) = Q_d == DeltaT_ACd * K * A_d;
 eq_d(3) = Q_d == c_pg * m_g * (T_AC11 - T_AC12);
 [ST_AC12, SA_d, SDELTA_T_d] = solve(eq_d);
    T_AC12 = double(ST_AC12);
       A_d = double(SA_d);
-DELTA_T_d = double(SDELTA_T_d);
+DeltaT_ACd = double(SDELTA_T_d);
 C_Ad = Z_A * A_d;
 
 %%  5.3 Mathematical Model of R123 Organic Rankine Cycle (ORC_R123) -------------------------------------
@@ -318,22 +324,26 @@ C_As = Z_A * A_s;
 Q_c = m_AC7 * (h_AC7 - h_AC8);                             % W, HT Rate of heat exchanger in desorber
 T_AC15 = T_0;
 T_AC16 = T_0H;
-DELTA_T_c = ((T_AC7 - T_AC16) - (T_AC8 - T_AC15)) / log((T_AC7 - T_AC16) / (T_AC8 - T_AC15));
-A_c = Q_c / DELTA_T_c / K;
+DeltaT_ACc = ((T_AC7 - T_AC16) - (T_AC8 - T_AC15)) / log((T_AC7 - T_AC16) / (T_AC8 - T_AC15));
+A_c = Q_c / DeltaT_ACc / K;
 h_AC15 = CoolProp.PropsSI('H', 'T', T_AC15, 'P', p_0, 'water');
 h_AC16 = CoolProp.PropsSI('H', 'T', T_AC16, 'P', p_0, 'water');
 m_c = Q_c / (h_AC16 - h_AC15);
 C_Ac = Z_A * A_c;
 C_Wc = Z_W * m_c * N * N_y * 3600;
-% Area of heat exchanger in evaporator A_e in AC_ALB.
-Q_e = m_AC9 * (h_AC10 - h_AC9);                        % W, Power of supplying cooling energy.
-C_Ce = Z_C * Q_e * N * N_y * 1000;                     % RMB, Profit of supplying cooling energy.
+% Area of heat exchanger in evaporator A_ACe in AC_ALB.
+Q_ACe = m_AC9 * (h_AC10 - h_AC9);                        % W, Power of supplying cooling energy.
+DeltaT_ACe = ((T_0 - T_AC10) - (T_cw - T_AC9)) / ...
+              log((T_0 - T_AC10) / (T_cw - T_AC9));
+m_ACcw = Q_ACe / (h_0 - h_cw).
+A_ACe = Q_ACe / DeltaT_ACe / K;
+C_ACcw = Z_cw * Q_e * N * N_y * 1000;                     % RMB, Profit of supplying cooling energy.
 % Area of heat exchanger in absorber A_a in AC_ALB.
 Q_a = m_AC10 * h_AC10 + m_AC6 * h_AC6 - m_AC1 * h_AC1; % W, HT rate of heat exchanger in desorber
 T_AC13 = T_0;
 T_AC14 = T_0H;
-DELTA_T_a = ((T_AC6 - T_AC14) - (T_AC1 - T_AC13)) / log((T_AC6 - T_AC14) / (T_AC1 - T_AC13));
-A_a = Q_a / DELTA_T_a / K;
+DeltaT_ACa = ((T_AC6 - T_AC14) - (T_AC1 - T_AC13)) / log((T_AC6 - T_AC14) / (T_AC1 - T_AC13));
+A_a = Q_a / DeltaT_ACa / K;
 h_AC13 = CoolProp.PropsSI('H', 'T', T_AC13, 'P', p_0, 'water');
 h_AC14 = CoolProp.PropsSI('H', 'T', T_AC14, 'P', p_0, 'water');
 m_a = Q_a / (h_AC14 - h_AC13);
@@ -364,7 +374,7 @@ z_ORC = Z_wORC * (W_ORC / Q_wORC)^ALPHA_wORC;            % RMB,  Non-energy cost
 %% 5. Define Objective Function -------------------------------------------------------------------------
 f = 1000000 - c_f * m_f * LHV - CRF * phi * (z_MT + z_HRSG) / (3600 * N) + C_E_MGT + ... % MGT Objective
     500000 - CRF * phi * z_AC / (3600 * N) + ...                                    % AC_ALB Objective 1
-    500000 - (C_As + C_Ad + C_Wc + C_Ac + C_Wa + C_Aa) - C_Ep + C_Ce + ...          % AC_ALB Objective 2
+    500000 - (C_As + C_Ad + C_Wc + C_Ac + C_Wa + C_Aa) - C_Ep + C_cw + ...          % AC_ALB Objective 2
     500000 - CRF * phi * z_ORC / (3600 * N) + ...                                 % ORC_R123 Objective 1
     500000 - (C_ORC1 + C_ORC2 + C_ORCw + C_EpORC) + C_E_ORC;                      % ORC_R123 Objective 2
 
