@@ -33,8 +33,6 @@ x(17) = 80 + 273.15;
 
 %% 1. General Constants ---------------------------------------------------------------------------------
 R = 8.314472;                                     % J/(mol*K), Universial Gas Constant
-T_ref = 20 + 273.15;                              % K  , temperature in reference state
-p_ref = 101.325 * 1000;                           % Pa , Pressure in Reference State
 p_0 = 101.325 * 1000;                             % Pa, Pressure of atmosphere.
 T_0 = 25 + 273.15;                                % K, Temperature of atmosphere.
 T_0H = 35 + 273.15;                               % K, Acceptable Highest Temp of atmosphere.
@@ -56,8 +54,9 @@ phi = 1.06;                                       % 维护因子
 h_8p = 640039.2;                                  % 回水的焓值 (503.97 + (589.30-503.97)/20*16.85) * 1000
 h_8 = 293316;                                     % 余热回收后的焓值 (251.56 + (335.29-251.56)/20*10) * 1000
 h_9 = 2748.6 * 1000;                              % 过热水蒸汽焓值
-c_pa = 1004;                                      % 空气比热容
-c_pg = 1170;                                      % 天然气比热容
+c_pa = 1004;                                      % J/kg/K, air specific heat capacity at constant pressure
+c_pg = 1170;                                      % J/kg/K, 实际燃气 specific heat capacity at constant pressure
+c_pw = 4200;                                      % J/kg/K, water specific heat capacity at constant pressure
 ETA_CC = 0.98877;
 % 1.2 Constants for AC_ALB
 K = 1000;                                         % W / m^2 / K, Thermal conductivity.
@@ -99,17 +98,17 @@ N_y = 10;                                         % Unit Years
 T_s = T_9; p_s = p_9;                             % Supplying steam.
 T_cw = 4 + 273.15; p_cw = p_0;                    % Supplying cooling water.
 %% Constants after Calculation.
-h_0 = CoolProp.PropsSI('H', 'T', T_0, 'P', p_0, 'water');
-h_s = CoolProp.PropsSI('H', 'T', T_s, 'P', p_s, 'water');
-h_cw = CoolProp.PropsSI('H', 'T', T_cw, 'P', p_cw, 'water');
+h_0 = CoolProp.PropsSI('H', 'T', T_0, 'P', p_0, 'Water');
+h_s = CoolProp.PropsSI('H', 'T', T_s, 'P', p_s, 'Water');
+h_cw = CoolProp.PropsSI('H', 'T', T_cw, 'P', p_cw, 'Water');
 %% 4. Decision Variables. -------------------------------------------------------------------------------
 % 4.1 Decision Variables in MGT.
       p_2 = x(1);               % Outlet Pressure of Air Compressor
-   eta_AC = x(2);               % Isentropic Efficiency of Air Compressor
-   eta_GT = x(3);               % Isentropic Efficiency of Gas Turbine
+Eta_MGTac = x(2);               % Isentropic Efficiency of Air Compressor
+ Eta_MGTt = x(3);               % Isentropic Efficiency of Gas Turbine
       T_3 = x(4);               % Outlet Temp of Air from Regenerator
       T_4 = x(5);               % Inlet Temp of Gas Turbine
-      m_s = x(6);               % Fluid Rate of Saturated Steam from HRSG
+      m_MGTs = x(6);               % Fluid Rate of Saturated Steam from HRSG
    W_pMGT = x(7);               % Net Power from Micro Gas Turbine
 % 4.2 Decision Variables in AC_ALB.
    T_AC10 = x(8);               % K,    Outlet temperature of Evaporator.
@@ -126,42 +125,42 @@ h_cw = CoolProp.PropsSI('H', 'T', T_cw, 'P', p_cw, 'water');
 
 
 %% 5.1 Mathematical Model of Micro Gas Turbine (MGT) ----------------------------------------------------
-T_2 = T_1 .* (1 + 1./eta_AC * ...
+T_2 = T_1 .* (1 + 1./Eta_MGTac * ...
       ((p_2./p_1)^((K_a-1)./K_a) - 1));                         % (1)  AC
 p_3 = p_2 * (1 - DELTA_p_aRE);                                  % (7)  RE
 p_4 = p_3 * (1 - DELTA_p_cc);                                   % (5)  CC
 p_6 = p_7 ./ (1 - DELTA_p_HRSG);                                % (14) HRSG
 p_5 = p_6 ./ (1 - DELTA_p_gRE);                                 % (8)  RE
-T_5 = T_4 * (1 - eta_GT * (1 - (p_4./p_5)^((1-K_g)./K_g)));     % (9)  GT
+T_5 = T_4 * (1 - Eta_MGTt * (1 - (p_4./p_5)^((1-K_g)./K_g)));     % (9)  GT
 H = (c_pg * T_4 - ETA_CC * LHV) ./ (c_pa * T_3 - ETA_CC * LHV); % (4) CC, H = m_a / m_g;
 m_g = W_pMGT ./ (c_pg*(T_4-T_5) - c_pa*(T_2-T_1)*H);            % (2) (10)
 m_a = H * m_g;                                                  % H = m_a / m_g;
 m_f = m_g - m_a;                                                % (3)  CC
 T_6 = T_5 - m_a * c_pa * (T_3 - T_2) ./ (m_g * c_pg);           % (6)  RE
-T_7p = T_6 - m_s * (h_9 - h_8p) ./ (m_g * c_pg);                % (12) HRSG
-T_7 = T_6 - m_s * (h_9 - h_8) ./ (m_g * c_pg);                  % (13) HRSG
+T_7p = T_6 - m_MGTs * (h_9 - h_8p) ./ (m_g * c_pg);                % (12) HRSG
+T_7 = T_6 - m_MGTs * (h_9 - h_8) ./ (m_g * c_pg);                  % (13) HRSG
 W_AC = m_a * c_pa * (T_2 - T_1);                                % (2)  AC
 W_GT = W_pMGT + W_AC;                                           % (11) GT
 
 %% 5.2 Mathematical Model of Aqueous Lithium-Bromide Absorption Chiller (AC_ALB)-------------------------
 % 5.2.1 Status 10 of AC_ALB.
-p_AC10 = CoolProp.PropsSI('P','T', T_AC10, 'Q', 1, 'water');
+p_AC10 = CoolProp.PropsSI('P','T', T_AC10, 'Q', 1, 'Water');
 p_L = p_AC10;
-s_AC10 = CoolProp.PropsSI('S', 'T', T_AC10, 'P', p_AC10, 'water');
-h_AC10 = CoolProp.PropsSI('H', 'T', T_AC10, 'P', p_AC10, 'water');
+s_AC10 = CoolProp.PropsSI('S', 'T', T_AC10, 'P', p_AC10, 'Water');
+h_AC10 = CoolProp.PropsSI('H', 'T', T_AC10, 'P', p_AC10, 'Water');
 % 5.2.2 Status 8 of AC_ALB.
-p_AC8 = CoolProp.PropsSI('P','T', T_AC8, 'Q', 0, 'water');
+p_AC8 = CoolProp.PropsSI('P','T', T_AC8, 'Q', 0, 'Water');
 p_H = p_AC8;
-s_AC8 = CoolProp.PropsSI('S', 'T', T_AC8, 'P', p_AC8, 'water');
-h_AC8 = CoolProp.PropsSI('H', 'T', T_AC8, 'P', p_AC8, 'water');
+s_AC8 = CoolProp.PropsSI('S', 'T', T_AC8, 'P', p_AC8, 'Water');
+h_AC8 = CoolProp.PropsSI('H', 'T', T_AC8, 'P', p_AC8, 'Water');
 % 5.2.3 Status 9 of AC_ALB.
 s_AC9 = s_AC8;
 p_AC9 = p_AC10;
 T_AC9 = T_AC10;
-h_AC9 = CoolProp.PropsSI('H', 'S', s_AC9, 'T', T_AC9, 'water');
+h_AC9 = CoolProp.PropsSI('H', 'S', s_AC9, 'T', T_AC9, 'Water');
 % 5.2.4 Status 1 of AC_ALB.
 p_AC1 = p_L;
-T_1wC = CoolProp.PropsSI('T', 'P', p_AC1, 'Q', 0, 'water') - 273.15;
+T_1wC = CoolProp.PropsSI('T', 'P', p_AC1, 'Q', 0, 'Water') - 273.15;
 a0 = -2.00755; a1 = 0.16976; a2 = -3.13336E-3; a3 = 1.97668E-5;
 b0 = 124.937;  b1 = -7.7162; b2 = 0.152286;    b3 = -7.9509E-4;
 T_AC1 = T_1wC * (a0 + a1 * (y_1*100) + a2 * (y_1*100)^2 + a3 * (y_1*100)^3) + ...
@@ -176,7 +175,7 @@ p_AC4 = p_H;
 m_AC2 = m_AC1; y_2 = y_1;
 m_AC3 = m_AC2; y_3 = y_2;
 m_AC4 = m_AC3 * y_3 / y_4;
-T_4wC = CoolProp.PropsSI('T', 'P', p_AC4, 'Q', 0, 'water') - 273.15;
+T_4wC = CoolProp.PropsSI('T', 'P', p_AC4, 'Q', 0, 'Water') - 273.15;
 T_AC4 = T_4wC * (a0 + a1 * (y_4*100) + a2 * (y_4*100)^2 + a3 * (y_4*100)^3) + ...
         b0 + b1 * (y_4*100) + b2 * (y_4*100)^2 + b3 * (y_4*100)^3 + 273.15;
 y_4str = num2str(y_4);
@@ -220,25 +219,25 @@ p_AC7 = p_H;
 % Vapor leaving desorber is assumed in equilibrium with ...
 % ... incoming solution stream concentration (state 3).
 % This is a standard assumption that represents the best possible case.
-T_3wC = CoolProp.PropsSI('T', 'P', p_AC3, 'Q', 0, 'water') - 273.15;
+T_3wC = CoolProp.PropsSI('T', 'P', p_AC3, 'Q', 0, 'Water') - 273.15;
 T_3sat = T_3wC * (a0 + a1 * (y_3*100) + a2 * (y_3*100)^2 + a3 * (y_3*100)^3) + ...
          b0 + b1 * (y_3*100) + b2 * (y_3*100)^2 + b3 * (y_3*100)^3 + 273.15;
 T_AC7 = T_3sat;
-h_AC7 = CoolProp.PropsSI('H', 'P', p_AC7, 'T', T_AC7, 'water');
-s_AC7 = CoolProp.PropsSI('S', 'P', p_AC7, 'T', T_AC7, 'water');
-%% Area of heat exchanger in desorber A_d.             ???
-T_AC11 = T_7;                                         % Temp of High Temp Smoke from MGT.
-Q_d = m_AC4 * h_AC4 + m_AC7 * h_AC7 - m_AC3 * h_AC3;  % W, HT Rate in desorber
-syms T_AC12 A_d DeltaT_ACd
-eq_d(1) = DeltaT_ACd == ((T_AC11 - T_AC4) - (T_AC12 - T_AC3)) ...
+h_AC7 = CoolProp.PropsSI('H', 'P', p_AC7, 'T', T_AC7, 'Water');
+s_AC7 = CoolProp.PropsSI('S', 'P', p_AC7, 'T', T_AC7, 'Water');
+%% Area of heat exchanger in desorber A_ACd.             ???
+T_AC11 = T_7; p_AC11 = p_7; p_AC12 = p_AC11;               % Temp of High Temp Smoke from MGT.
+Q_ACd = m_AC4 * h_AC4 + m_AC7 * h_AC7 - m_AC3 * h_AC3;       % W, HT Rate in desorber
+syms T_AC12 A_ACd DeltaT_ACd
+eq_ACd(1) = DeltaT_ACd == ((T_AC11 - T_AC4) - (T_AC12 - T_AC3)) ...
                         / log((T_AC11 - T_AC4) / (T_AC12 - T_AC3));
-eq_d(2) = Q_d == DeltaT_ACd * K * A_d;
-eq_d(3) = Q_d == c_pg * m_g * (T_AC11 - T_AC12);
-[ST_AC12, SA_d, SDELTA_T_d] = solve(eq_d);
+eq_ACd(2) = Q_ACd == DeltaT_ACd * K * A_ACd;
+eq_ACd(3) = Q_ACd == c_pg * m_g * (T_AC11 - T_AC12);
+[ST_AC12, SA_ACd, SDeltaT_ACd] = solve(eq_ACd);
    T_AC12 = double(ST_AC12);
-      A_d = double(SA_d);
-DeltaT_ACd = double(SDELTA_T_d);
-C_Ad = Z_A * A_d;
+      A_ACd = double(SA_ACd);
+DeltaT_ACd = double(SDeltaT_ACd);
+C_ACd = Z_A * A_ACd;
 
 %%  5.3 Mathematical Model of R123 Organic Rankine Cycle (ORC_R123) -------------------------------------
 % 5.3.1 Status 1, 1-2 Pump
@@ -293,7 +292,7 @@ v_ORC4 = v_ORC4(imag(v_ORC4)==0);
 s_ORC4 = s_ORC3;
 h_ORC4 = CoolProp.PropsSI('H', 'P', p_ORC4, 'Q', 1, 'R123');
 %% Area of Heat Exchange in Evaporator within ORC_R123.
-T_ORC19 = T_AC12;
+T_ORC19 = T_AC12; p_ORC19 = p_AC12; p_ORC20 = p_ORC19;
 Q_ORC1 = m_ORC * (h_ORC3 - h_ORC2);
 syms T_ORC20 A_ORC1 DELTA_T_ORC1
 eq_ORC1(1) = DELTA_T_ORC1 == ((T_ORC19 - T_ORC3) - (T_ORC20 - T_ORC2)) / ...
@@ -310,48 +309,56 @@ DELTA_T_ORC1 = double(SDELTA_T_ORC1);
 ETA_t = W_pMGT ./ (m_f * LHV);                             % Thermo Efficiency of MGT
 P = A_MGT + B_MGT * log(W_pMGT/1000) + C_MGT * exp(ETA_t); % 单位功率价格, P = 0.9;
 z_MT = P * W_pMGT / 1000;                                  % 燃气轮机的购置费
-Q_HRSG = (h_9 - h_8) * m_s;                                % 余热锅炉热负荷
+Q_HRSG = (h_9 - h_8) * m_MGTs;                                % 余热锅炉热负荷
 % z_HRSG = z_w * (Q_HRSG ./ Q_w)^ALPHA;                    % 余热锅炉购置费 ???
 z_HRSG = (Q_HRSG * 4.851)^ALPHA;                           % 余热锅炉购置费
 C_E_MGT = W_pMGT * ETA_G * Z_E * N * N_y * 1000;           % Profit from Electricity generated by MGT.
 %% 6.2 Economic Model of AC_ALB.
-% Area of heat exchanger in solution heat exchanger A_s in AC_ALB.
-Q_s = m_AC2 * (h_AC3 - h_AC2);
-DELTA_T_s = ((T_AC4 - T_AC3) - (T_AC5 - T_AC2)) / log((T_AC4 - T_AC3) / (T_AC5 - T_AC2));
-A_s = Q_s / (DELTA_T_s * K);
-C_As = Z_A * A_s;
-% Area of heat exchanger in condenser A_c in AC_ALB.
+% Area of heat exchanger in solution heat exchanger A_ACs in AC_ALB.
+Q_ACs = m_AC2 * (h_AC3 - h_AC2);
+DeltaT_ACs = ((T_AC4 - T_AC3) - (T_AC5 - T_AC2)) / log((T_AC4 - T_AC3) / (T_AC5 - T_AC2));
+A_ACs = Q_ACs / (DeltaT_ACs * K);
+Ca_ACs = Z_A * A_ACs;
+% Area of heat exchanger in condenser A_ACc in AC_ALB.
 Q_c = m_AC7 * (h_AC7 - h_AC8);                             % W, HT Rate of heat exchanger in desorber
 T_AC15 = T_0;
 T_AC16 = T_0H;
 DeltaT_ACc = ((T_AC7 - T_AC16) - (T_AC8 - T_AC15)) / log((T_AC7 - T_AC16) / (T_AC8 - T_AC15));
 A_c = Q_c / DeltaT_ACc / K;
-h_AC15 = CoolProp.PropsSI('H', 'T', T_AC15, 'P', p_0, 'water');
-h_AC16 = CoolProp.PropsSI('H', 'T', T_AC16, 'P', p_0, 'water');
+h_AC15 = CoolProp.PropsSI('H', 'T', T_AC15, 'P', p_0, 'Water');
+h_AC16 = CoolProp.PropsSI('H', 'T', T_AC16, 'P', p_0, 'Water');
 m_c = Q_c / (h_AC16 - h_AC15);
 C_Ac = Z_A * A_c;
 C_Wc = Z_W * m_c * N * N_y * 3600;
 % Area of heat exchanger in evaporator A_ACe in AC_ALB.
 Q_ACe = m_AC9 * (h_AC10 - h_AC9);                        % W, Power of supplying cooling energy.
-DeltaT_ACe = ((T_0 - T_AC10) - (T_cw - T_AC9)) / ...
-              log((T_0 - T_AC10) / (T_cw - T_AC9));
-m_ACcw = Q_ACe / (h_0 - h_cw).
-A_ACe = Q_ACe / DeltaT_ACe / K;
-C_ACcw = Z_cw * Q_e * N * N_y * 1000;                     % RMB, Profit of supplying cooling energy.
-% Area of heat exchanger in absorber A_a in AC_ALB.
-Q_a = m_AC10 * h_AC10 + m_AC6 * h_AC6 - m_AC1 * h_AC1; % W, HT rate of heat exchanger in desorber
+T_AC17 = T_0; p_AC17 = p_0; p_AC18 = p_AC17;
+h_AC17 = h_w0; s_AC17 = s_w0; E_ACph17 = E_w0;
+T_AC18 = 5 + 273.15;
+syms m_ACcw A_ACe DeltaT_ACe
+eq_ACe(1) = DeltaT_ACe == ((T_AC17 - T_AC10) - (T_AC18 - T_AC9)) ...
+                        / log((T_AC17 - T_AC10) / (T_AC18 - T_AC9));
+eq_ACe(2) = Q_ACe == DELTA_T_e * K * A_ACe;
+eq_ACe(3) = Q_ACe == c_pw * m_ACcw * (T_AC17 - T_AC18);
+[Sm_ACcw, SA_e, SDeltaT_ACe] = solve(eq_ACe);
+  m_ACcw = double(Sm_ACcw);
+   A_ACe = double(SA_ACe);
+DeltaT_e = double(SDeltaT_ACe);
+C_ACcw = Z_cw * m_ACcw * N * N_y * 3600;
+% Area of heat exchanger in absorber A_ACa in AC_ALB.
+Q_ACa = m_AC10 * h_AC10 + m_AC6 * h_AC6 - m_AC1 * h_AC1; % W, HT rate of heat exchanger in desorber
 T_AC13 = T_0;
 T_AC14 = T_0H;
 DeltaT_ACa = ((T_AC6 - T_AC14) - (T_AC1 - T_AC13)) / log((T_AC6 - T_AC14) / (T_AC1 - T_AC13));
-A_a = Q_a / DeltaT_ACa / K;
-h_AC13 = CoolProp.PropsSI('H', 'T', T_AC13, 'P', p_0, 'water');
-h_AC14 = CoolProp.PropsSI('H', 'T', T_AC14, 'P', p_0, 'water');
-m_a = Q_a / (h_AC14 - h_AC13);
-C_Aa = Z_A * A_a;
-C_Wa = Z_W * m_a * N * N_y * 3600;
-W_ACp = m_AC1 * (h_AC2 - h_AC1);                        % W,   Electricity required for pump.
-C_Ep = Z_E * W_ACp * N * N_y * 1000;                    % RMB, Cost of electricity required for pump.
-z_AC = Q_e * (Q_wAC / Z_wAC)^ALPHA_wAC;                 % RMB, Estimated purchased price of AC_ALB.
+A_ACa = Q_ACa / DeltaT_ACa / K;
+h_AC13 = CoolProp.PropsSI('H', 'T', T_AC13, 'P', p_0, 'Water');
+h_AC14 = CoolProp.PropsSI('H', 'T', T_AC14, 'P', p_0, 'Water');
+m_ACa = Q_ACa / (h_AC14 - h_AC13);
+C_ACa = Z_A * A_ACa;
+Cw_ACa = Z_W * m_ACa * N * N_y * 3600;
+W_ACa = m_AC1 * (h_AC2 - h_AC1);                        % W,   Electricity required for pump.
+Ce_ACa = Z_E * W_ACa * N * N_y * 1000;                    % RMB, Cost of electricity required for pump.
+z_AC = Q_ACe * (Q_wAC / Z_wAC)^ALPHA_wAC;                 % RMB, Estimated purchased price of AC_ALB.
 %% 6.3 Economic Model of ORC_R123.
 % Area of Heat Exchange in Condenser within ORC_R123.
 T_ORC21 = T_0;
@@ -359,8 +366,8 @@ T_ORC22 = T_0H;
 Q_ORC2 = m_ORC * (h_ORC4 - h_ORC1);
 DELTA_T_ORC2 = ((T_ORC4 - T_ORC22) - (T_ORC1 - T_ORC21)) / log((T_ORC4 - T_ORC22) / (T_ORC1 - T_ORC21));
 A_ORC2 = Q_ORC2 / DELTA_T_ORC2 / K;
-h_ORC21 = CoolProp.PropsSI('H', 'T', T_ORC21, 'P', p_0, 'water');
-h_ORC22 = CoolProp.PropsSI('H', 'T', T_ORC22, 'P', p_0, 'water');
+h_ORC21 = CoolProp.PropsSI('H', 'T', T_ORC21, 'P', p_0, 'Water');
+h_ORC22 = CoolProp.PropsSI('H', 'T', T_ORC22, 'P', p_0, 'Water');
 m_ORC2 = Q_ORC2 / (h_ORC22 - h_ORC21);                   % kg/s, Amount of supplying cooling water.
 W_ORC = m_ORC * (h_ORC3 - h_ORC4);                       % W,    Output work of ORC_R123.
 C_E_ORC = W_ORC * ETA_G * Z_E * N * N_y * 1000;          % RMB,  Profit of output work of ORC_R123.
@@ -374,7 +381,7 @@ z_ORC = Z_wORC * (W_ORC / Q_wORC)^ALPHA_wORC;            % RMB,  Non-energy cost
 %% 5. Define Objective Function -------------------------------------------------------------------------
 f = 1000000 - c_f * m_f * LHV - CRF * phi * (z_MT + z_HRSG) / (3600 * N) + C_E_MGT + ... % MGT Objective
     500000 - CRF * phi * z_AC / (3600 * N) + ...                                    % AC_ALB Objective 1
-    500000 - (C_As + C_Ad + C_Wc + C_Ac + C_Wa + C_Aa) - C_Ep + C_cw + ...          % AC_ALB Objective 2
+    500000 - (Ca_ACs + Ca_ACd + Cw_ACc + Ca_ACc + Cw_ACa + Ca_ACa) - Ce_ACa + C_Ce + ...          % AC_ALB Objective 2
     500000 - CRF * phi * z_ORC / (3600 * N) + ...                                 % ORC_R123 Objective 1
     500000 - (C_ORC1 + C_ORC2 + C_ORCw + C_EpORC) + C_E_ORC;                      % ORC_R123 Objective 2
 
