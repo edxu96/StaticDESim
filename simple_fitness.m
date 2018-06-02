@@ -1,7 +1,7 @@
 % Title: Thermo-economic Optimization of Distributed Energy System in Green Energy Island.
 % Based on the theory of nolinear equality and inequality constraints.
 % Method: Genetic Algorithm within MATLAB Global Optimization Toolbox.
-% Version: 1.3, 2018.6.2, Jie Xu.
+% Version: 1.4, 2018.6.2, Jie Xu.
 % SubTitle: Fitness Function for Exergy Damage Minimization
 % 1. Micro Gas Turbine (MGT)
 % 2. Aqueous Lithium-Bromine Single-Effect Absorption Chiller (AC_ALB)
@@ -148,7 +148,6 @@ T_cw = 4 + 273.15; p_cw = p_0;                    % Supplying cooling water.
   Ms = 100000;
  Mcw = 100000;
   We = 100000;
-  Ms_
 %% 4. Decision Variables. -------------------------------------------------------------------------------
 % 4.1 Decision Variables in MGT.
       p_2 = x(1);               % Pa,   Outlet Pressure of Air Compressor
@@ -213,8 +212,9 @@ T_6 = T_5 - m_a * c_pa * (T_3 - T_2) ./ (m_g * c_pg);           % (6)  RE
 h_9 = h_s;
 T_7p = T_6 - Ms_MGT * (h_9 - h_8p) ./ (m_g * c_pg);             % (12) HRSG
 T_7 = T_6 - Ms_MGT * (h_9 - h_8) ./ (m_g * c_pg);               % (13) HRSG
-W_AC = m_a * c_pa * (T_2 - T_1);                                % (2)  AC
-W_GT = Wp_MGT + W_AC;                                           % (11) GT
+Wp_MGTac = m_a * c_pa * (T_2 - T_1);                            % (2)  AC
+Wp_MGTt = Wp_MGT + Wp_MGTac;                                    % (11) GT
+We_MGT = Wp_MGT * EtaG_MGTt;
 %% 5.1.2 Calculate the h and s of air and gas before combustion.
 % Calculate the h, s, E_ph of air, fuel and water in status 0.
 h_a0 = CoolProp.PropsSI('H', 'T', T_0, 'P', p_0, 'Air');
@@ -327,13 +327,13 @@ ex_f = HHV;                                            % J/kg
 Ed_MGTac = m_a * ex_ph1 - m_a * ex_ph2;
 Ed_MGTre = (ex_ph2 * m_a + ex_ph5 * m_g) - (ex_ph3 * m_a + ex_ph6 * m_g);
 Ed_MGTcc = (ex_ph3 * m_a + ex_f * m_f) - ex_ph4 * m_g;
-Ed_MGTt = ex_ph4 * m_g - (W_GT + ex_ph5 * m_g);
+Ed_MGTt = ex_ph4 * m_g - (Wp_MGT + ex_ph5 * m_g);
 Ed_MGTre = (ex_ph2 * m_a + ex_ph5 * m_g) - (ex_ph3 * m_a + ex_ph6 * m_g);
 Ed_MGThrsg = (ex_ph8 * Ms_MGT + ex_ph6 * m_g) - (ex_ph9 * Ms_MGT + ex_ph7 * m_g);
 % Exergy efficiency of components of MGT.
 PhiE_MGTcc = ex_ph4 * m_g / (ex_ph3 * m_a + ex_f * m_f);
-PhiE_MGTt = W_GT / ((ex_ph4 - ex_ph5) * m_g);
-PhiE_MGTac = (ex_ph2 - ex_ph1) * m_a / W_AC;
+PhiE_MGTt = Wp_MGT / ((ex_ph4 - ex_ph5) * m_g);
+PhiE_MGTac = (ex_ph2 - ex_ph1) * m_a / Wp_MGTac;
 PhiE_MGTre = (ex_ph3 * m_a + ex_ph6 * m_g) / (ex_ph2 * m_a + ex_ph5 * m_g);
 PhiE_MGThrsg = (ex_ph9 * Ms_MGT + ex_ph7 * m_g) / (ex_ph8 * Ms_MGT + ex_ph6 * m_g);
 %% 5.2 Mathematical Model of Aqueous Lithium-Bromide Absorption Chiller (AC_ALB)-------------------------
@@ -811,11 +811,17 @@ switch Ms > Ms_MGT + Ms_HPc
   case '0'
     Ed_s = Ms_MGT + Ms_HPc - Ms;
 end
+switch We > We_ORCt + We_MGT - We_ORCp - We_HPp - We_VCCp
+  case '1'
+    Ed_e = 2 * (We - (We_ORCt + We_MGT - We_ORCp - We_HPp - We_VCCp));
+  case '0'
+    Ed_e = - ((We_ORCt + We_MGT - We_ORCp - We_HPp - We_VCCp) - We);
+end
 % Exergy Objective Function
 f = 1000000000 - Ed_MGTac - Ed_MGTre - Ed_MGTcc - Ed_MGTt - Ed_MGTre - Ed_MGThrsg + ...
     1000000000 - Ed_ACa - Ed_ACd - Ed_ACe - Ed_ACc - Ed_ACs - Ed_ACp + ...
     1000000000 - Ed_ORCc - Ed_ORCe - Ed_ORCp - Ed_ORCt + ...
     1000000000 - Ed_HPc - Ed_HPe - Ed_HPp + ...
     1000000000 - Ed_VCCc - Ed_VCCe - Ed_VCCp + ...
-    1000000000 - Ed_cw - Ed_s;
+    1000000000 - Ed_cw - Ed_s - Ed_e;
 end
