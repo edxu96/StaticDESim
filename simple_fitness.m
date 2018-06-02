@@ -99,7 +99,6 @@ Q_wORC = 23.6 * 1000;                             % W,   ????
 Z_wORC = 385600;                                  % RMB, ????
 ALPHA_wORC = 0.73;                                %      ????
 EtaG_MGTt = 0.9; EtaG_ORCt = 0.9;                 % Efficiency of generator.
-
 %% 1.4 Constants for HP_R410a.
 R = 8.314472;                                 % J/(mol*K), Universial Gas Constant
 m_R410a = 72.58 / 1000;                       % kg / mol , Molar Mass
@@ -144,13 +143,12 @@ aTc_R134a = 0.457235529 * (Rg_R134a * Tc_R134a)^2 ./ Pc_R134a;    % Critical Poi
 b_R134a = 0.077796074 * Rg_R134a * Tc_R134a ./ Pc_R134a;           % m^3/mol, Critical Point Restriction "b_R134a",
                                               % Temperature-independent parameter in PR-EOS
 %% 3. Pre-defined Condition. ----------------------------------------------------------------------------
-N = 8000;                                         % Operating Hours in Unit Years
-N_y = 10;                                         % Unit Years
 p_s = 500 * 1000;                                 % Pa, Pressure of supplying steam.
 T_cw = 4 + 273.15; p_cw = p_0;                    % Supplying cooling water.
-  Ms = 10000;
- Mcw = 10000;
-   E = 10000;
+  Ms = 100000;
+ Mcw = 100000;
+  We = 100000;
+  Ms_
 %% 4. Decision Variables. -------------------------------------------------------------------------------
 % 4.1 Decision Variables in MGT.
       p_2 = x(1);               % Pa,   Outlet Pressure of Air Compressor
@@ -183,15 +181,15 @@ Eta_MGTac = x(2);               %       Isentropic Efficiency of Air Compressor
   T_VCC2 = x(24);               % K,    Outlet temperature of compressor.
    M_VCC = x(25);               % kg/s, Fluid Rate.
 %% 5. Mathematical Model of Green Energy Island ----------------------------------------------------------
-E_s  = Ms; %
-E_cw = 1000;
-Ex_e  = 1000;
 h_w0 = CoolProp.PropsSI('H', 'T', T_0, 'P', p_0, 'Water');
 s_w0 = CoolProp.PropsSI('S', 'T', T_0, 'P', p_0, 'Water');
 ex_ph0 = 0;
 h_s = CoolProp.PropsSI('H', 'P', p_s, 'Q', 1, 'Water');
 s_s = CoolProp.PropsSI('S', 'P', p_s, 'Q', 1, 'Water');
 E_s = (h_s - h_w0) + T_0 * (s_s - s_w0);
+h_cw = CoolProp.PropsSI('H', 'T', T_cw, 'P', p_cw, 'Water');
+s_cw = CoolProp.PropsSI('S', 'T', T_cw, 'P', p_cw, 'Water');
+E_cw = (h_cw - h_w0) + T_0 * (s_cw - s_w0);
 h_w0H = CoolProp.PropsSI('H', 'T', T_0H, 'P', p_0, 'Water');
 s_w0H = CoolProp.PropsSI('S', 'T', T_0H, 'P', p_0, 'Water');
 E_w0H = (h_w0H - h_w0) + T_0 * (s_w0H - s_w0);
@@ -445,13 +443,13 @@ Q_ACe = M_AC9 * (h_AC10 - h_AC9);
 T_AC17 = T_0; p_AC17 = p_0; p_AC18 = p_AC17;
 h_AC17 = h_w0; s_AC17 = s_w0; ex_AC17 = E_w0;
 T_AC18 = 5 + 273.15;
-syms Mcw_AC A_ACe DeltaT_ACe
+syms Mcw_ACe A_ACe DeltaT_ACe
 eq_ACe(1) = DeltaT_ACe == ((T_AC17 - T_AC10) - (T_AC18 - T_AC9)) ...
                         / log((T_AC17 - T_AC10) / (T_AC18 - T_AC9));
 eq_ACe(2) = Q_ACe == DELTA_T_e * K * A_ACe;
-eq_ACe(3) = Q_ACe == c_pw * Mcw_AC * (T_AC17 - T_AC18);
-[SMcw_AC, SA_e, SDeltaT_ACe] = solve(eq_ACe);
-  Mcw_AC = double(SMcw_AC);
+eq_ACe(3) = Q_ACe == c_pw * Mcw_ACe * (T_AC17 - T_AC18);
+[SMcw_ACe, SA_e, SDeltaT_ACe] = solve(eq_ACe);
+  Mcw_ACe = double(SMcw_ACe);
    A_ACe = double(SA_ACe);
 DeltaT_e = double(SDeltaT_ACe);
 Ed_ACe = (E_AC9 * M_AC9 + E_w0 * Mcw_ACe) - (E_AC10 * M_AC10 + E_cw * M_cwACe);
@@ -701,7 +699,7 @@ Ms_HPc = Q_HPc / (h_9 - h_0);
 DeltaT_HPc = ((T_HP2 - T_9) - (T_HP3 - T_0)) ...
               / log((T_HP2 - T_9) / (T_HP3 - T_0));
 A_HPc = Q_HPc / DeltaT_HPc / K;
-Ed_HPc = (E_HP2 * M_HP + E_w0 * Ms_HPc) - (E_HP3 * M_HP + E_s * Ms_HP);
+Ed_HPc = (E_HP2 * M_HP + E_w0 * Ms_HPc) - (E_HP3 * M_HP + E_s * Ms_HPc);
 % Area of heat exchange in evaporator A_HPe.
 Q_HPe = M_HP * (h_HP1 - h_HP4);
 M_HPe = Q_HPe / (h_w0 - h_w0L);
@@ -787,40 +785,37 @@ Wi_VCCp = M_VCC * (H_VCC2 - H_VCC1);
 We_VCCp = M_VCC * (h_VCC2 - h_VCC1);
 Ed_VCCp = (E_VCC1 * M_VCC + We_VCCp) - E_VCC2 * M_VCC;
 % Exergy damage in condenser of VCC_R410a.
-Q_VCCc = M_VCC * (h_VCC2 - h_VCC3);  % W, HT Rate in desorber
-Ms_VCCc = Q_VCCc / (h_9 - h_0);
-DeltaT_VCCc = ((T_VCC2 - T_9) - (T_VCC3 - T_0)) ...
-              / log((T_VCC2 - T_9) / (T_VCC3 - T_0));
+Q_VCCc = M_VCC * (H_VCC2 - H_VCC3);                        % W, HT Rate in desorber
+M_VCCc = Q_VCCc / (h_0H - h_0);
+DeltaT_VCCc == ((T_VCC2 - T_0H) - (T_VCC3 - T_0)) ...
+                / log((T_VCC2 - T_0H) / (T_VCC3 - T_0));
 A_VCCc = Q_VCCc / DeltaT_VCCc / K;
-Ed_VCCc = (E_VCC2 * M_VCC + E_w0 * Ms_VCCc) - (E_VCC3 * M_VCC + E_s * Ms_VCC);
-% Area of heat exchange in evaporator A_VCCe.
-Q_VCCe = M_VCC * (h_VCC1 - h_VCC4);
-M_VCCe = Q_VCCe / (h_w0 - h_w0L);
-DeltaT_VCCe = ((T_0 - T_VCC1) - (T_0L - T_VCC4)) ...
-              / log((T_0 - T_VCC1) / (T_0L - T_VCC4));
-A_VCCe = Q_VCCe / DeltaT_VCCe / K;
-Ed_VCCe = (E_VCC4 * M_VCC + E_w0 * M_VCCe) - (E_VCC1 * M_VCC + E_w0L * M_VCCe);
+Ed_VCCc = (E_VCC2 * M_VCC + E_w0 * M_VCCc) - (E_VCC3 * M_VCC + E_w0H * M_VCCc);
+% Exergy damage in evaporator of VCC_R410a.
+Q_VCCe = M_VCC * (H_VCC1 - H_VCC4);
+Mcw_VCCe = Q_VCCc / (h_0 - h_cw);
+DeltaT_VCCc == ((T_0 - T_VCC1) - (T_cw - T_VCC4)) ...
+                / log((T_0 - T_VCC1) / (T_cw - T_VCC4));
+A_VCCe = Q_VCCe / DeltaT_VCCc / K;
+Ed_VCCe = (E_VCC4 * M_VCC + E_w0 * M_VCCe) - (E_VCC1 * M_VCC + E_cw * Mcw_VCCe);
 %% 5. Define Objective Function -------------------------------------------------------------------------
-% 5.1 Exergy Objective Function
+switch Mcw > Mcw_ACe + Mcw_VCCe
+  case '1'
+    Ed_cw = 2 * (Mcw - Mcw_ACe - Mcw_VCCe);
+  case '0'
+    Ed_cw = Mcw_ACe + Mcw_VCCe - Mcw;
+end
+switch Ms > Ms_MGT + Ms_HPc
+  case '1'
+    Ed_s = 2 * (Ms - Ms_MGT - Ms_HPc);
+  case '0'
+    Ed_s = Ms_MGT + Ms_HPc - Ms;
+end
+% Exergy Objective Function
 f = 1000000000 - Ed_MGTac - Ed_MGTre - Ed_MGTcc - Ed_MGTt - Ed_MGTre - Ed_MGThrsg + ...
     1000000000 - Ed_ACa - Ed_ACd - Ed_ACe - Ed_ACc - Ed_ACs - Ed_ACp + ...
-    1000000000 - Ed_ORCc - Ed_ORCe - Ed_ORCp - Ed_ORCt;
-    1000000000 - Ed_HPc - Ed_HPe - Ed_HPp;
-    1000000000 - Ed_VCCc - Ed_VCCe - Ed_VCCp;
-% 5.2 Thermo-economic Objective Function
-%{
-f = 1000000 - Z_f * m_f * LHV - CRF * PhiM * (z_MT + z_HRSG) / (3600 * N) + C_E_MGT + ... % MGT Objective
-    500000 - CRF * PhiM * z_AC / (3600 * N) + ...                                         % AC_ALB Objective 1
-    500000 - (Ca_ACs + Ca_ACd + Cw_ACc + Ca_ACc + Cw_ACa + Ca_ACa) - Ce_ACa + C_Ce + ...  % AC_ALB Objective 2
-    500000 - CRF * PhiM * z_ORC / (3600 * N) + ...                                        % ORC_R123 Objective 1
-    500000 - (C_ORC1 + C_ORC2 + C_ORCw + C_EpORC) + C_E_ORC;                              % ORC_R123 Objective 2
-%}
-%% Plot the result of exergy analysis.
-% Plot the bar chart of exergy efficiency of equipments in MGT.
-BAR_MGTxE = categorical({'PhiEx_C_C','PhiEx_G_T','PhiEx_A_C','PhiEx_R_E','PhiEx_H_R_S_G', ...
-                        'PhiE_MGTacd','PhiE_MGTace','PhiEx_ORC1','PhiEx_ORC'});
-BAR_MGTyE = [PhiE_MGTcc, PhiE_MGTt, PhiE_MGTac, PhiE_MGTre, PhiE_MGThrsg, PhiE_MGTacd, PhiE_MGTace, PhiEx_ORC1, PhiEx_ORC];
-BAR_MGT = bar(BAR_MGTxE, BAR_MGTyE, 0.5);
-ylim([0 1.1]);
-title('绿色能源岛各组分㶲效率条形图 Bar Chart of Exergy Efficiency of GEI', ...
-      'FontSize',20,'FontWeight','bold');
+    1000000000 - Ed_ORCc - Ed_ORCe - Ed_ORCp - Ed_ORCt + ...
+    1000000000 - Ed_HPc - Ed_HPe - Ed_HPp + ...
+    1000000000 - Ed_VCCc - Ed_VCCe - Ed_VCCp + ...
+    1000000000 - Ed_cw - Ed_s;
+end
