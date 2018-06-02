@@ -1,8 +1,8 @@
 % Title: Thermo-economic Optimization of Distributed Energy System in Green Energy Island.
 % Based on the theory of nolinear equality and inequality constraints.
 % Method: Genetic Algorithm within MATLAB Global Optimization Toolbox.
-% Version: 1.1, 2018.6.2, Jie Xu.
-% SubTitle: Calculate and the result of GEI optim, then exergy analysis.
+% Version: 1.3, 2018.6.2, Jie Xu.
+% SubTitle: Fitness Function for Exergy Damage Minimization
 % 1. Micro Gas Turbine (MGT)
 % 2. Aqueous Lithium-Bromine Single-Effect Absorption Chiller (AC_ALB)
 % 3. R123 Organic Recycle Cycle (ORC_R123)
@@ -98,7 +98,8 @@ b_R123 = 0.077796074 * Rg_R123 * ...              % m^3/mol, Critical Point Rest
 Q_wORC = 23.6 * 1000;                             % W,   ????
 Z_wORC = 385600;                                  % RMB, ????
 ALPHA_wORC = 0.73;                                %      ????
-Eta_G = 0.9;                                      % Efficiency of generator.
+EtaG_MGTt = 0.9; EtaG_ORCt = 0.9;                 % Efficiency of generator.
+
 %% 1.4 Constants for HP_R410a.
 R = 8.314472;                                 % J/(mol*K), Universial Gas Constant
 m_R410a = 72.58 / 1000;                       % kg / mol , Molar Mass
@@ -134,8 +135,8 @@ ETA_v = 0.8;                                  % Efficiency of throttle valve.
 ETA_p = 0.8;                                  % Efficiency of compressor(p).
 ETA_e = 0.9;                                  % Efficiency of evaporator.
 ETA_c = 0.9;                                  % Efficiency of condenser.
-DeltaP_C = 100 * 1000;                       % Pa, Pressure drop in condenser.
-DeltaP_E = 100 * 1000;                       % Pa, Pressure drop in evaporator.
+DeltaP_C = 100 * 1000;                        % Pa, Pressure drop in condenser.
+DeltaP_E = 100 * 1000;                        % Pa, Pressure drop in evaporator.
 Omega_R134a = 0.332;                                % Acentric Factor.
 Kappa_R134a = 0.37464 + ...                         % Dependent on Omega_R134a(working substance),
         (1.54226 - 0.26992 * Omega_R134a) * Omega_R134a;  % Temperature-independent parameter in PR-EOS
@@ -182,14 +183,21 @@ Eta_MGTac = x(2);               %       Isentropic Efficiency of Air Compressor
   T_VCC2 = x(24);               % K,    Outlet temperature of compressor.
    M_VCC = x(25);               % kg/s, Fluid Rate.
 %% 5. Mathematical Model of Green Energy Island ----------------------------------------------------------
-Ex_s  = Ms; %
-Ex_cw = 1000;
+E_s  = Ms; %
+E_cw = 1000;
 Ex_e  = 1000;
 h_w0 = CoolProp.PropsSI('H', 'T', T_0, 'P', p_0, 'Water');
 s_w0 = CoolProp.PropsSI('S', 'T', T_0, 'P', p_0, 'Water');
 ex_ph0 = 0;
 h_s = CoolProp.PropsSI('H', 'P', p_s, 'Q', 1, 'Water');
 s_s = CoolProp.PropsSI('S', 'P', p_s, 'Q', 1, 'Water');
+E_s = (h_s - h_w0) + T_0 * (s_s - s_w0);
+h_w0H = CoolProp.PropsSI('H', 'T', T_0H, 'P', p_0, 'Water');
+s_w0H = CoolProp.PropsSI('S', 'T', T_0H, 'P', p_0, 'Water');
+E_w0H = (h_w0H - h_w0) + T_0 * (s_w0H - s_w0);
+h_w0L = CoolProp.PropsSI('H', 'T', T_0L, 'P', p_0, 'Water');
+s_w0L = CoolProp.PropsSI('S', 'T', T_0L, 'P', p_0, 'Water');
+E_w0L = (h_w0L - h_w0) + T_0 * (s_w0L - s_w0);
 %% 5.1 Mathematical Model of Micro Gas Turbine (MGT) ----------------------------------------------------
 % 5.1.1 Mathematical Model of Brayton Cycle.
 T_2 = T_1 .* (1 + 1./Eta_MGTac * ...
@@ -318,11 +326,18 @@ ex_ph9 = (h_9 - h_w0) - T_0 * (s_9 - s_w0);
 r_water = (2257.2 * 1000);                            % J/kg, latent heat of vaporization
 HHV = LHV + 1000/16 * n_gC * y_H * 18/1000 * r_water; % J/kg
 ex_f = HHV;                                            % J/kg
-PhiEx_CC = ex_ph4 / (ex_ph3 + ex_f);
-PhiEx_GT = W_GT / ((ex_ph4 - ex_ph5) * m_a);
-PhiEx_AC = (ex_ph2 - ex_ph1) * m_a / W_AC;
-PhiEx_RE = (ex_ph3 * m_a + ex_ph6 * m_g) / (ex_ph2 * m_a + ex_ph5 * m_g);
-PhiEx_HRSG = (ex_ph9 * Ms_MGT + ex_ph7 * m_g) / (ex_ph8 * Ms_MGT + ex_ph6 * m_g);
+Ed_MGTac = m_a * ex_ph1 - m_a * ex_ph2;
+Ed_MGTre = (ex_ph2 * m_a + ex_ph5 * m_g) - (ex_ph3 * m_a + ex_ph6 * m_g);
+Ed_MGTcc = (ex_ph3 * m_a + ex_f * m_f) - ex_ph4 * m_g;
+Ed_MGTt = ex_ph4 * m_g - (W_GT + ex_ph5 * m_g);
+Ed_MGTre = (ex_ph2 * m_a + ex_ph5 * m_g) - (ex_ph3 * m_a + ex_ph6 * m_g);
+Ed_MGThrsg = (ex_ph8 * Ms_MGT + ex_ph6 * m_g) - (ex_ph9 * Ms_MGT + ex_ph7 * m_g);
+% Exergy efficiency of components of MGT.
+PhiE_MGTcc = ex_ph4 * m_g / (ex_ph3 * m_a + ex_f * m_f);
+PhiE_MGTt = W_GT / ((ex_ph4 - ex_ph5) * m_g);
+PhiE_MGTac = (ex_ph2 - ex_ph1) * m_a / W_AC;
+PhiE_MGTre = (ex_ph3 * m_a + ex_ph6 * m_g) / (ex_ph2 * m_a + ex_ph5 * m_g);
+PhiE_MGThrsg = (ex_ph9 * Ms_MGT + ex_ph7 * m_g) / (ex_ph8 * Ms_MGT + ex_ph6 * m_g);
 %% 5.2 Mathematical Model of Aqueous Lithium-Bromide Absorption Chiller (AC_ALB)-------------------------
 % Reference State of Lithium Bromide Solution and Water in AC_ALB.
 s_w0 = CoolProp.PropsSI('S', 'T', T_0, 'P', p_0, 'Water');
@@ -333,19 +348,19 @@ p_AC10 = CoolProp.PropsSI('P','T', T_AC10, 'Q', 1, 'Water');
 p_L = p_AC10;
 s_AC10 = CoolProp.PropsSI('S', 'T', T_AC10, 'P', p_AC10, 'Water');
 h_AC10 = CoolProp.PropsSI('H', 'T', T_AC10, 'P', p_AC10, 'Water');
-ex_AC10 = (h_AC10 - h_w0) - T_0 * (s_AC10 - s_w0);
+E_AC10 = (h_AC10 - h_w0) - T_0 * (s_AC10 - s_w0);
 % 5.2.2 Status 8 of AC_ALB.
 p_AC8 = CoolProp.PropsSI('P','T', T_AC8, 'Q', 0, 'Water');
 p_H = p_AC8;
 s_AC8 = CoolProp.PropsSI('S', 'T', T_AC8, 'P', p_AC8, 'Water');
 h_AC8 = CoolProp.PropsSI('H', 'T', T_AC8, 'P', p_AC8, 'Water');
-ex_AC8 = (h_AC8 - h_w0) - T_0 * (s_AC8 - s_w0);
+E_AC8 = (h_AC8 - h_w0) - T_0 * (s_AC8 - s_w0);
 % 5.2.3 Status 9 of AC_ALB.
 s_AC9 = s_AC8;
 p_AC9 = p_AC10;
 T_AC9 = T_AC10;
 h_AC9 = CoolProp.PropsSI('H', 'S', s_AC9, 'T', T_AC9, 'Water');
-ex_AC9 = (h_AC9 - h_w0) - T_0 * (s_AC9 - s_w0);
+E_AC9 = (h_AC9 - h_w0) - T_0 * (s_AC9 - s_w0);
 % 5.2.4 Status 1 of AC_ALB.
 p_AC1 = p_L;
 T_1wC = CoolProp.PropsSI('T', 'P', p_AC1, 'Q', 0, 'Water') - 273.15;
@@ -360,7 +375,7 @@ RHO_1 = CoolProp.PropsSI('D', 'T', T_AC1, 'P', p_AC1, strcat('INCOMP::LiBr[',y_1
 v_1 = 1 / RHO_1;
 s_sT0 = CoolProp.PropsSI('S', 'T', T_0, 'P', p_0, strcat('INCOMP::LiBr[',y_1str,']'));
 h_sT0 = CoolProp.PropsSI('H', 'T', T_0, 'P', p_0, strcat('INCOMP::LiBr[',y_1str,']'));
-ex_AC1 = (h_AC1 - h_sT0) - T_0 * (s_AC1 - s_sT0);
+E_AC1 = (h_AC1 - h_sT0) - T_0 * (s_AC1 - s_sT0);
 % 5.2.5 Status 4 of AC_ALB.
 p_AC4 = p_H;
 M_AC2 = M_AC1; y_2 = y_1;
@@ -374,14 +389,14 @@ s_AC4 = CoolProp.PropsSI('S', 'T', T_AC4, 'Q', 0, strcat('INCOMP::LiBr[',y_4str,
 h_AC4 = CoolProp.PropsSI('H', 'T', T_AC4, 'Q', 0, strcat('INCOMP::LiBr[',y_4str,']'));
 s_sD0 = CoolProp.PropsSI('S', 'T', T_0, 'P', p_0, strcat('INCOMP::LiBr[',y_4str,']'));
 h_sD0 = CoolProp.PropsSI('H', 'T', T_0, 'P', p_0, strcat('INCOMP::LiBr[',y_4str,']'));
-ex_AC4 = (h_AC4 - h_sD0) - T_0 * (s_AC4 - s_sD0);
+E_AC4 = (h_AC4 - h_sD0) - T_0 * (s_AC4 - s_sD0);
 % 5.2.6 Status 2 of AC_ALB.
 s_AC2 = s_AC1;
 p_AC2 = p_H;
 h_AC2 = h_AC1 + v_1 * (p_AC2 - p_AC1);
 w_p = M_AC2 * h_AC2 - M_AC1 * h_AC1;
 T_AC2 = T_AC1;
-ex_AC2 = (h_AC2 - h_sT0) - T_0 * (s_AC2 - s_sT0);
+E_AC2 = (h_AC2 - h_sT0) - T_0 * (s_AC2 - s_sT0);
 % 5.2.7 Status 5 of AC_ALB.
 M_AC5 = M_AC4;
 y_5 = y_4;
@@ -390,7 +405,7 @@ T_AC5 = T_AC4 - (T_AC4 - T_AC2) * Eta_shx;
 y_5str = num2str(y_5);
 s_AC5 = CoolProp.PropsSI('S', 'T', T_AC5, 'P', p_AC5, strcat('INCOMP::LiBr[',y_5str,']'));
 h_AC5 = CoolProp.PropsSI('H', 'T', T_AC5, 'P', p_AC5, strcat('INCOMP::LiBr[',y_5str,']'));
-ex_AC5 = (h_AC5 - h_sD0) - T_0 * (s_AC5 - s_sD0);
+E_AC5 = (h_AC5 - h_sD0) - T_0 * (s_AC5 - s_sD0);
 % 5.2.8 Status 3 of AC_ALB.
 p_AC3 = p_H;
 Q_shx = M_AC4 * h_AC4 - M_AC5 * h_AC5;
@@ -398,7 +413,7 @@ h_AC3 = (Q_shx + M_AC2 * h_AC2) / M_AC3;
 y_3str = num2str(y_3);
 T_AC3 = CoolProp.PropsSI('T', 'H', h_AC3-5000, 'P', p_AC3, strcat('INCOMP::LiBr[',y_3str,']')); % ????
 s_AC3 = CoolProp.PropsSI('S', 'T', T_AC3, 'P', p_AC3, strcat('INCOMP::LiBr[',y_3str,']'));
-ex_AC3 = (h_AC3 - h_sT0) - T_0 * (s_AC3 - s_sT0);
+E_AC3 = (h_AC3 - h_sT0) - T_0 * (s_AC3 - s_sT0);
 % 5.2.9 Status 6 of AC_ALB.
 y_6 = y_5;
 T_AC6 = T_AC5;
@@ -407,7 +422,7 @@ p_AC6 = p_AC1;
 y_6str = num2str(y_6);
 s_AC6 = CoolProp.PropsSI('S', 'T', T_AC6, 'P', p_AC6, strcat('INCOMP::LiBr[',y_6str,']'));
 M_AC6 = M_AC4;
-ex_AC5 = (h_AC5 - h_sD0) - T_0 * (s_AC5 - s_sD0);
+E_AC5 = (h_AC5 - h_sD0) - T_0 * (s_AC5 - s_sD0);
 % 5.2.10 Status 7 of AC_ALB.
 M_AC7 = M_AC3 - M_AC4;
 M_AC8 = M_AC7;
@@ -423,22 +438,9 @@ T_3sat = T_3wC * (a0 + a1 * (y_3*100) + a2 * (y_3*100)^2 + a3 * (y_3*100)^3) + .
 T_AC7 = T_3sat;
 h_AC7 = CoolProp.PropsSI('H', 'P', p_AC7, 'T', T_AC7, 'Water');
 s_AC7 = CoolProp.PropsSI('S', 'P', p_AC7, 'T', T_AC7, 'Water');
-ex_AC7 = (h_AC7 - h_w0) - T_0 * (s_AC7 - s_w0);
-%% 5.3 Area of heat exchanger in desorber A_d.             ???
-T_AC11 = T_7; p_AC11 = p_7; p_AC12 = p_AC11;          % Temp of High Temp Smoke from MGT.
-h_AC11 = h_g7; s_AC11 = h_g7; ex_AC11 = ex_ph7;
-Q_ACd = M_AC4 * h_AC4 + M_AC7 * h_AC7 - M_AC3 * h_AC3;       % W, HT Rate in desorber
-syms T_AC12 A_ACd DeltaT_ACd
-eq_ACd(1) = DeltaT_ACd == ((T_AC11 - T_AC4) - (T_AC12 - T_AC3)) ...
-                        / log((T_AC11 - T_AC4) / (T_AC12 - T_AC3));
-eq_ACd(2) = Q_ACd == DeltaT_ACd * K * A_ACd;
-eq_ACd(3) = Q_ACd == c_pg * m_g * (T_AC11 - T_AC12);
-[ST_AC12, SA_ACd, SDeltaT_ACd] = solve(eq_ACd);
-   T_AC12 = double(ST_AC12);
-      A_ACd = double(SA_ACd);
-DeltaT_ACd = double(SDeltaT_ACd);
-C_ACd = Z_A * A_ACd;
-% Area of heat exchanger in evaporator A_ACe in AC_ALB.
+E_AC7 = (h_AC7 - h_w0) - T_0 * (s_AC7 - s_w0);
+%% 5.3 Exergy Analysis of AC_ALB. -------------------------------------------------------------------------------------
+% 5.3.1 Exergy damage in evaporator of AC_ALB.
 Q_ACe = M_AC9 * (h_AC10 - h_AC9);
 T_AC17 = T_0; p_AC17 = p_0; p_AC18 = p_AC17;
 h_AC17 = h_w0; s_AC17 = s_w0; ex_AC17 = E_w0;
@@ -452,7 +454,20 @@ eq_ACe(3) = Q_ACe == c_pw * Mcw_AC * (T_AC17 - T_AC18);
   Mcw_AC = double(SMcw_AC);
    A_ACe = double(SA_ACe);
 DeltaT_e = double(SDeltaT_ACe);
-C_ACcw = Z_cw * Mcw_AC * N * N_y * 3600;
+Ed_ACe = (E_AC9 * M_AC9 + E_w0 * Mcw_ACe) - (E_AC10 * M_AC10 + E_cw * M_cwACe);
+% 5.3.2 Exergy damage in desorber A_ACd.
+T_AC11 = T_7; p_AC11 = p_7; p_AC12 = p_AC11;          % Temp of High Temp Smoke from MGT.
+h_AC11 = h_g7; s_AC11 = h_g7; E_AC11 = ex_ph7;
+Q_ACd = M_AC4 * h_AC4 + M_AC7 * h_AC7 - M_AC3 * h_AC3;       % W, HT Rate in desorber
+syms T_AC12 A_ACd DeltaT_ACd
+eq_ACd(1) = DeltaT_ACd == ((T_AC11 - T_AC4) - (T_AC12 - T_AC3)) ...
+                        / log((T_AC11 - T_AC4) / (T_AC12 - T_AC3));
+eq_ACd(2) = Q_ACd == DeltaT_ACd * K * A_ACd;
+eq_ACd(3) = Q_ACd == c_pg * m_g * (T_AC11 - T_AC12);
+[ST_AC12, SA_ACd, SDeltaT_ACd] = solve(eq_ACd);
+   T_AC12 = double(ST_AC12);
+      A_ACd = double(SA_ACd);
+DeltaT_ACd = double(SDeltaT_ACd);
 % Calculate the h, s, E_ph of gas in status 12.
 h_a12 = CoolProp.PropsSI('H', 'T', T_AC12, 'P', p_AC12, 'Air');
 s_a12 = CoolProp.PropsSI('S', 'T', T_AC12, 'P', p_AC12, 'Air');
@@ -466,10 +481,34 @@ h_g12 = m_ax/m_g * h_a12 + (m_a-m_ax)/m_g * y_H*18/M_gC * h_H12 + ...
        (m_a-m_ax)/m_g * y_C*44/M_gC * h_C12 + (m_a-m_ax)/m_g * y_N*28/M_gC * h_N12;
 s_g12 = m_ax/m_g * s_a12 + (m_a-m_ax)/m_g * y_H*18/M_gC * s_H12 + ...
        (m_a-m_ax)/m_g * y_C*44/M_gC * s_C12 + (m_a-m_ax)/m_g * y_N*28/M_gC * s_N12;
-ex_AC12 = (h_g12 - h_g0) - T_0 * (s_g12 - s_g0);
-C_Ad = Z_A * A_d;
-PhiEx_ACd = (ex_AC7 * M_AC7 + ex_AC12 * m_g + ex_AC4 * m_4) / ...
-          (ex_AC11 * m_g + ex_AC3 * M_AC3);
+E_AC12 = (h_g12 - h_g0) - T_0 * (s_g12 - s_g0);
+PhiE_MGTacd = (E_AC7 * M_AC7 + ex_AC12 * m_g + E_AC4 * m_4) / ...
+              (ex_AC11 * m_g + E_AC3 * M_AC3);
+Ed_ACd = (E_AC11 * m_g + E_AC3 * M_AC3) - (E_AC7 * M_AC7 + E_AC4 * M_AC4 + E_AC12 * m_g);
+% 5.3.3 Exergy damage in condenser A_ACc.
+Q_ACc = M_AC7 * (h_AC7 - h_AC8);
+T_AC15 = T_0;
+T_AC16 = T_0H;
+DeltaT_ACc = ((T_AC7 - T_AC16) - (T_AC8 - T_AC15)) / log((T_AC7 - T_AC16) / (T_AC8 - T_AC15));
+A_ACc = Q_ACc / DeltaT_ACc / K;
+h_AC15 = CoolProp.PropsSI('H', 'T', T_AC15, 'P', p_0, 'Water');
+h_AC16 = CoolProp.PropsSI('H', 'T', T_AC16, 'P', p_0, 'Water');
+M_ACc = Q_ACc / (h_AC16 - h_AC15);
+Ed_ACc = (E_AC7 * M_AC7 + E_w0 * M_ACc) - (E_AC8 * M_AC8 + E_w0H * M_ACc);
+% 5.3.4 Exergy damage in solution heat exchanger A_ACs.
+Ed_ACs = (E_AC2 * M_AC2 + E_AC4 * M_AC4) - (E_AC3 * M_AC3 + E_AC5 * M_AC5);
+% 5.3.5 Exergy damage in absorber of A_ACa.
+Q_ACa = M_AC10 * h_AC10 + M_AC6 * h_AC6 - M_AC1 * h_AC1; % W, HT rate of heat exchanger in desorber
+T_AC13 = T_0;
+T_AC14 = T_0H;
+DeltaT_ACa = ((T_AC6 - T_AC14) - (T_AC1 - T_AC13)) / log((T_AC6 - T_AC14) / (T_AC1 - T_AC13));
+A_ACa = Q_ACa / DeltaT_ACa / K;
+h_AC13 = CoolProp.PropsSI('H', 'T', T_AC13, 'P', p_0, 'Water');
+h_AC14 = CoolProp.PropsSI('H', 'T', T_AC14, 'P', p_0, 'Water');
+M_ACa = Q_ACa / (h_AC14 - h_AC13);
+Ed_ACa = (E_AC6 * M_AC6 + E_AC10 * M_AC10 + E_w0 * M_ACa) - (E_w0H * M_ACa + E_AC1 * M_AC1);
+% 5.3.6 Exergy damage in other components of AC_ALB.
+Ed_ACp = E_AC1 * M_AC1 - E_AC2 * M_AC2;
 %%  5.4 Mathematical Model of R123 Organic Rankine Cycle (ORC_R123) -------------------------------------
 % 5.4.0 Status 0 of R123.
 s_ORC0 = CoolProp.PropsSI('S', 'T', T_0, 'P', p_0, 'R123');
@@ -486,13 +525,13 @@ v_ORC1 = D_ORC1 / 1;
 p_ORC1 = CoolProp.PropsSI('P', 'T', T_ORC1, 'Q', 0, 'R123');
 s_ORC1 = CoolProp.PropsSI('S', 'T', T_ORC1, 'Q', 0, 'R123');
 h_ORC1 = CoolProp.PropsSI('H', 'T', T_ORC1, 'Q', 0, 'R123');
-E_ORCph1 = (h_ORC1 - h_ORC0) - T_0 * (s_ORC1 - s_ORC0);
+E_ORC1 = (h_ORC1 - h_ORC0) - T_0 * (s_ORC1 - s_ORC0);
 %% 5.4.2 Status 2, 2-3 Evaporator
 h_ORC2 = h_ORC1 + v_ORC1 * (p_ORC2 - p_ORC1);
 T_ORC2 = T_ORC1;                                    % ???
 % T_ORC2 = CoolProp.PropsSI('T', 'H', h_ORC2, 'P', p_ORC2, 'R123');
 s_ORC2 = s_ORC1 / ETA_ps;                                             % ???
-E_ORCph2 = (h_ORC2 - h_ORC0) - T_0 * (s_ORC2 - s_ORC0);
+E_ORC2 = (h_ORC2 - h_ORC0) - T_0 * (s_ORC2 - s_ORC0);
 %% 5.4.3 Status 3, 3-4 Gas Turbine
 syms v_3sym
 p_ORC3 = p_ORC2;
@@ -505,7 +544,7 @@ v_ORC3 = double(Sv_3sym);
 v_ORC3 = v_ORC3(imag(v_ORC3)==0);
 s_ORC3 = CoolProp.PropsSI('S', 'T', T_ORC3, 'P', p_ORC3, 'R123');
 h_ORC3 = CoolProp.PropsSI('H', 'T', T_ORC3, 'P', p_ORC3, 'R123');
-E_ORCph3 = (h_ORC3 - h_ORC0) - T_0 * (s_ORC3 - s_ORC0);
+E_ORC3 = (h_ORC3 - h_ORC0) - T_0 * (s_ORC3 - s_ORC0);
 %% 5.4.4 Status 4, 4-1 Condenser
 p_ORC4 = p_ORC1;
 T_ORC4 = CoolProp.PropsSI('T', 'P', p_ORC4, 'Q', 1, 'R123');
@@ -529,10 +568,11 @@ v_ORC4 = v_ORC4(imag(v_ORC4)==0);
 %}
 s_ORC4 = s_ORC3;
 h_ORC4 = CoolProp.PropsSI('H', 'P', p_ORC4, 'Q', 1, 'R123');
-E_ORCph4 = (h_ORC4 - h_ORC0) - T_0 * (s_ORC4 - s_ORC0);
-%% 5.6 Area of Heat Exchange in Evaporator within ORC_R123.
+E_ORC4 = (h_ORC4 - h_ORC0) - T_0 * (s_ORC4 - s_ORC0);
+%% Exergy Analysis of ORC_R123.
+% Exergy damage of evaporator in ORC_R123.
 T_ORC19 = T_AC12; p_ORC19 = p_AC12; p_ORC20 = p_ORC19;
-h_ORC19 = h_AC12; s_ORC19 = s_AC12; E_ORCph19 = ex_AC12;
+h_ORC19 = h_AC12; s_ORC19 = s_AC12; E_ORC19 = ex_AC12;
 Q_ORC1 = M_ORC * (h_ORC3 - h_ORC2);
 syms T_ORC20 A_ORC1 DELTA_T_ORC1
 eq_ORC1(1) = DELTA_T_ORC1 == ((T_ORC19 - T_ORC3) - (T_ORC20 - T_ORC2)) / ...
@@ -556,10 +596,32 @@ h_g20 = m_ax/m_g * h_a20 + (m_a-m_ax)/m_g * y_H*18/M_gC * h_H20 + ...
        (m_a-m_ax)/m_g * y_C*44/M_gC * h_C20 + (m_a-m_ax)/m_g * y_N*28/M_gC * h_N20;
 s_g20 = m_ax/m_g * s_a20 + (m_a-m_ax)/m_g * y_H*18/M_gC * s_H20 + ...
        (m_a-m_ax)/m_g * y_C*44/M_gC * s_C20 + (m_a-m_ax)/m_g * y_N*28/M_gC * s_N20;
-E_ORCph20 = (h_g20 - h_g0) - T_0 * (s_g20 - s_g0);
-PhiEx_ORC1 = (E_ORCph4 * M_ORC + E_ORCph20 * m_g) / (E_ORCph19 * m_g + E_ORCph3 * M_ORC);
+E_ORC20 = (h_g20 - h_g0) - T_0 * (s_g20 - s_g0);
+PhiEx_ORC1 = (E_ORC4 * M_ORC + E_ORC20 * m_g) / (E_ORC19 * m_g + E_ORC3 * M_ORC);
+Ed_ORCe = (E_ORC19 * m_g + E_ORC3 * M_ORC) - (E_ORC4 * M_ORC + E_ORC20 * m_g);
+% Exergy damage of condenser in ORC_R123.
+T_ORC21 = T_0;
+T_ORC22 = T_0H;
+Q_ORC2 = M_ORC * (h_ORC4 - h_ORC1);
+DELTA_T_ORC2 = ((T_ORC4 - T_ORC22) - (T_ORC1 - T_ORC21)) ...
+                / log((T_ORC4 - T_ORC22) / (T_ORC1 - T_ORC21));
+A_ORC2 = Q_ORC2 / DELTA_T_ORC2 / K;
+h_ORC21 = CoolProp.PropsSI('H', 'T', T_ORC21, 'P', p_0, 'Water');
+h_ORC22 = CoolProp.PropsSI('H', 'T', T_ORC22, 'P', p_0, 'Water');
+M_ORCc = Q_ORC2 / (h_ORC22 - h_ORC21);                   % kg/s, Amount of supplying cooling water.
+Ed_ORCc = (E_ORC4 * M_ORC + E_w0 * M_ORCc) - (E_ORC1 * M_ORC + E_w0H * M_ORCc);
+% Exergy damage of gae turbine in ORC_R123.
+Wp_ORCt = M_ORC * (h_ORC3 - h_ORC4);                       % W,    Output work of ORC_R123.
+We_ORCt = Wp_ORCt * EtaG_ORCt;
+Ed_ORCt = E_ORC3 * M_ORC - (E_ORC4 * M_ORC + We_ORCt);
+% Exergy damage of pump in ORC_R123.
+We_ORCp = M_ORC * (h_ORC2 - h_ORC1);                      % W,    Required Work of Pump in ORC_R123.
+Ed_ORCp = (E_ORC1 * M_ORC + We_ORCp) - E_ORC2 * M_ORC;
 %% 5.5 Mathematical Model of HP_R410a. -----------------------------------------------------------
-%% 3. (1)
+% 5.5.1 Status 0 of HP_R410a.
+S_HP0 = CoolProp.PropsSI('S', 'T', T_0, 'P', p_0, 'R410a');
+h_HP0 = CoolProp.PropsSI('H', 'T', T_0, 'P', p_0, 'R410a');
+%% 5.5.2 Status 1 of HP_R410a.
 P_HP1 = CoolProp.PropsSI('P', 'T', T_HP1, 'Q', 1, 'R410a');
 % Solve for V_HP1
 syms V_HP1sym
@@ -572,9 +634,10 @@ SV_HP1sym = solve(P_HP1 == R*T_HP1 / (V_HP1sym-b_R410a) - ...
 V_HP1 = double(SV_HP1sym);
 V_HP1 = V_HP1(imag(V_HP1)==0);
 %
-S_HP1 = CoolProp.PropsSI('S', 'T', T_HP1, 'Q', 1, 'R134a');
-h_HP1 = CoolProp.PropsSI('H', 'T', T_HP1, 'Q', 1, 'R134a');
-%% 4. (4)
+S_HP1 = CoolProp.PropsSI('S', 'T', T_HP1, 'Q', 1, 'R410a');
+h_HP1 = CoolProp.PropsSI('H', 'T', T_HP1, 'Q', 1, 'R410a');
+E_HP1 = (h_HP1 - h_HP0) - T_0 * (s_HP1 - s_HP0);
+%% 5.5.3 Status 4 of HP_R410a.
 P_HP4 = P_HP1; T_HP4 = T_HP1;
 % Solve for V_HP4.
 syms V_HP4sym
@@ -589,7 +652,8 @@ V_HP4 = V_HP4(imag(V_HP4)==0);
 %
 S_HP4 = CoolProp.PropsSI('S', 'T', T_HP4, 'P', P_HP4, 'R410a');
 h_HP4 = CoolProp.PropsSI('H', 'T', T_HP4, 'P', P_HP4, 'R410a');
-%% (3)
+E_HP4 = (h_HP4 - h_HP0) - T_0 * (s_HP4 - s_HP0);
+%% 5.5.4 Status 3 of HP_R410a.
 % <8> solve V_HP3 through Equation for Density of the Saturated Liquid.
 Af = 1.000000; Bf =  1.984734;    Cf = -1.767593E-01;
 Df = 1.819972; Ef = -7.171684E-1;
@@ -610,7 +674,8 @@ P_HP3 = P_HP3(imag(P_HP3)==0);
 %
 S_HP3 = CoolProp.PropsSI('S', 'T', T_HP3, 'Q', 0, 'R410a');
 h_HP3 = CoolProp.PropsSI('H', 'T', T_HP3, 'Q', 0, 'R410a');
-%% (2)
+E_HP3 = (h_HP3 - h_HP0) - T_0 * (s_HP3 - s_HP0);
+%% 5.5.5 Status 2 of HP_R410a.
 P_HP2 = P_HP3; S_HP2 = S_HP1;
 % <11> Solve for V_HP2.
 syms V_HP2sym
@@ -625,184 +690,136 @@ V_HP2 = V_HP2(imag(V_HP2)==0);
 %
 S_HP2 = CoolProp.PropsSI('S', 'T', T_HP2, 'P', P_HP2, 'R410a');
 h_HP2 = CoolProp.PropsSI('H', 'T', T_HP2, 'P', P_HP2, 'R410a');
-% Input work of compressor Wi_HPc.
-Wi_HPc = M_HP * (h_HP2 - h_HP1);
-%% 5.5 Mathematical Model of HP_R410a. -----------------------------------------------------------
-% 3. (1)
+E_HP2 = (h_HP2 - h_HP0) - T_0 * (s_HP2 - s_HP0);
+%% Exergy Analysis of HP_R410a.
+% Exergy damage in pump of HP_R410a.
+We_HPp = M_HP * (h_HP2 - h_HP1);
+Ed_HPp = (E_HP1 * M_HP + We_HPp) - E_HP2 * M_HP;
+% Exergy damage in condenser of HP_R410a.
+Q_HPc = M_HP * (h_HP2 - h_HP3);  % W, HT Rate in desorber
+Ms_HPc = Q_HPc / (h_9 - h_0);
+DeltaT_HPc = ((T_HP2 - T_9) - (T_HP3 - T_0)) ...
+              / log((T_HP2 - T_9) / (T_HP3 - T_0));
+A_HPc = Q_HPc / DeltaT_HPc / K;
+Ed_HPc = (E_HP2 * M_HP + E_w0 * Ms_HPc) - (E_HP3 * M_HP + E_s * Ms_HP);
+% Area of heat exchange in evaporator A_HPe.
+Q_HPe = M_HP * (h_HP1 - h_HP4);
+M_HPe = Q_HPe / (h_w0 - h_w0L);
+DeltaT_HPe = ((T_0 - T_HP1) - (T_0L - T_HP4)) ...
+              / log((T_0 - T_HP1) / (T_0L - T_HP4));
+A_HPe = Q_HPe / DeltaT_HPe / K;
+Ed_HPe = (E_HP4 * M_HP + E_w0 * M_HPe) - (E_HP1 * M_HP + E_w0L * M_HPe);
+%% 5.6 Mathematical Model of VCC_R134a. -----------------------------------------------------------
+% 5.6.1 Status 1 of VCC_R134a.
 % <1> Solve T_VCC4 through Equation for Saturated Vapor Pressure.
 A =  4.069889E1;  B = -2.362540E3;  C = -1.306883E1;
 D =  7.616005E-3; E =  2.342564E-1; F =  3.761111E2;
-P_HP1 = 10^(A + B./T_VCC1 + C * log10(T_VCC1) + D * T_VCC1 + ...
-          E * ((F-T_VCC1)./T_VCC1) * log10(F-T_VCC1)) * 1000;
-% <2> Solve for V_HP1
-syms V_HP1sym
-Tr_HP1 = T_VCC1 ./ Tc_R134a;                             % Reduced Temerature
-ALPHASqrt1 = 1 + Kappa_R134a * (1 - sqrt(Tr_HP1));
+P_VCC1 = 10^(A + B./T_VCC1 + C * log10(T_VCC1) + D * T_VCC1 + ...
+         E * ((F-T_VCC1)./T_VCC1) * log10(F-T_VCC1)) * 1000;
+% <2> Solve for V_VCC1
+syms V_VCC1sym
+Tr_VCC1 = T_VCC1 ./ Tc_R134a;                             % Reduced Temerature
+ALPHASqrt1 = 1 + Kappa_R134a * (1 - sqrt(Tr_VCC1));
 ALPHA4 = ALPHASqrt1^2;                                   % Temperature-dependent parameter in PR-EOS
-aT_HP1 = aTc_R134a * ALPHA4;                             % Temperature-dependent parameter in PR-EOS (dimensions depend on equation)
-SV_HP1sym = solve(P_HP1 == R*T_VCC1 / (V_HP1sym-b_R134a) - ...
-                  aT_HP1 / (V_HP1sym*(V_HP1sym+b_R134a) + b_R134a*(V_HP1sym-b_R134a)));
-V_HP1 = double(SV_HP1sym);
-V_HP1 = V_HP1(imag(V_HP1)==0);
+aT_VCC1 = aTc_R134a * ALPHA4;                             % Temperature-dependent parameter in PR-EOS (dimensions depend on equation)
+SV_VCC1sym = solve(P_VCC1 == R*T_VCC1 / (V_VCC1sym-b_R134a) - ...
+                  aT_VCC1 / (V_VCC1sym*(V_VCC1sym+b_R134a) + b_R134a*(V_VCC1sym-b_R134a)));
+V_VCC1 = double(SV_VCC1sym);
+V_VCC1 = V_VCC1(imag(V_VCC1)==0);
 %
 S_VCC1 = CoolProp.PropsSI('S', 'T', T_VCC1, 'Q', 1, 'R123');
 H_VCC1 = CoolProp.PropsSI('H', 'T', T_VCC1, 'Q', 1, 'R123');
-% 4. (4)
-P_HP4 = P_HP1; T_VCC4 = T_VCC1;
-% <5> Solve for V_HP4.
-syms V_HP4sym
-Tr_HP4 = T_VCC4 ./ Tc_R134a;                             % Reduced Temerature
-ALPHASqrt4 = 1 + Kappa_R134a * (1 - sqrt(Tr_HP4));
+% 5.6.2 Status 4 of VCC_R134a.
+P_VCC4 = P_VCC1; T_VCC4 = T_VCC1;
+% <5> Solve for V_VCC4.
+syms V_VCC4sym
+Tr_VCC4 = T_VCC4 ./ Tc_R134a;                             % Reduced Temerature
+ALPHASqrt4 = 1 + Kappa_R134a * (1 - sqrt(Tr_VCC4));
 ALPHA4 = ALPHASqrt4^2;                                   % Temperature-dependent parameter in PR-EOS
-aT_HP4 = aTc_R134a * ALPHA4;                             % Temperature-dependent parameter in PR-EOS (dimensions depend on equation)
-SV_HP4sym = solve(P_HP4 == R*T_VCC4 / (V_HP4sym-b_R134a) - ...
-                  aT_HP4 / (V_HP4sym*(V_HP4sym+b_R134a) + b_R134a*(V_HP4sym-b_R134a)));
-V_HP4 = double(SV_HP4sym);
-V_HP4 = V_HP4(imag(V_HP4)==0);
+aT_VCC4 = aTc_R134a * ALPHA4;                             % Temperature-dependent parameter in PR-EOS (dimensions depend on equation)
+SV_VCC4sym = solve(P_VCC4 == R*T_VCC4 / (V_VCC4sym-b_R134a) - ...
+                  aT_VCC4 / (V_VCC4sym*(V_VCC4sym+b_R134a) + b_R134a*(V_VCC4sym-b_R134a)));
+V_VCC4 = double(SV_VCC4sym);
+V_VCC4 = V_VCC4(imag(V_VCC4)==0);
 %
-S_VCC4 = CoolProp.PropsSI('S', 'T', T_VCC4, 'P', P_HP4, 'R123');
-H_VCC4 = CoolProp.PropsSI('H', 'T', T_VCC4, 'P', P_HP4, 'R123');
-% (3)
-% <8> solve V_HP3 through Equation for Density of the Saturated Liquid.
+S_VCC4 = CoolProp.PropsSI('S', 'T', T_VCC4, 'P', P_VCC4, 'R123');
+H_VCC4 = CoolProp.PropsSI('H', 'T', T_VCC4, 'P', P_VCC4, 'R123');
+% 5.6.3 Status 3 of VCC_R134a.
+% <8> solve V_VCC3 through Equation for Density of the Saturated Liquid.
 Af =  5.281464E2; Bf =  7.551834E2; Cf = 1.028676E3;
 Df = -9.491172E2; Ef = 5.935660E2;
-Tr_HP3 = T_VCC3 ./ Tc_R134a;                             % Reduced Temerature
-RHO_3 = Af + Bf * (1-Tr_HP3).^(1/3) + Cf * (1-Tr_HP3).^(2/3) + ...
-        Df * (1-Tr_HP3) + Ef - (1-Tr_HP3).^(4/3);
-V_HP3 = RHO_3 / 1;
-% <9> Solve for P_HP3.
-syms P_HP3sym
-Tr_HP3 = T_VCC3 ./ Tc_R134a;                             % Reduced Temerature
-ALPHASqrt3 = 1 + Kappa_R134a * (1 - sqrt(Tr_HP3));
+Tr_VCC3 = T_VCC3 ./ Tc_R134a;                             % Reduced Temerature
+RHO_3 = Af + Bf * (1-Tr_VCC3).^(1/3) + Cf * (1-Tr_VCC3).^(2/3) + ...
+        Df * (1-Tr_VCC3) + Ef - (1-Tr_VCC3).^(4/3);
+V_VCC3 = RHO_3 / 1;
+% <9> Solve for P_VCC3.
+syms P_VCC3sym
+Tr_VCC3 = T_VCC3 ./ Tc_R134a;                             % Reduced Temerature
+ALPHASqrt3 = 1 + Kappa_R134a * (1 - sqrt(Tr_VCC3));
 ALPHA3 = ALPHASqrt3^2;                         % Temperature-dependent parameter in PR-EOS
-aT_HP3 = aTc_R134a * ALPHA3;                          % Temperature-dependent parameter in PR-EOS (dimensions depend on equation)
-SP_HP3sym = solve(P_HP3sym == R*T_VCC3 / (V_HP3-b_R134a) - ...
-                aT_HP3 / (V_HP3*(V_HP3+b_R134a) + b_R134a*(V_HP3-b_R134a)));
-P_HP3 = double(SP_HP3sym);
-P_HP3 = P_HP3(imag(P_HP3)==0);
+aT_VCC3 = aTc_R134a * ALPHA3;                          % Temperature-dependent parameter in PR-EOS (dimensions depend on equation)
+SP_VCC3sym = solve(P_VCC3sym == R*T_VCC3 / (V_VCC3-b_R134a) - ...
+                aT_VCC3 / (V_VCC3*(V_VCC3+b_R134a) + b_R134a*(V_VCC3-b_R134a)));
+P_VCC3 = double(SP_VCC3sym);
+P_VCC3 = P_VCC3(imag(P_VCC3)==0);
 %
 S_VCC3 = CoolProp.PropsSI('S', 'T', T_VCC3, 'Q', 0, 'R134a');
 H_VCC3 = CoolProp.PropsSI('H', 'T', T_VCC3, 'Q', 0, 'R134a');
-% (2)
-P_HP2 = P_HP3; S_VCC2 = S_VCC1;
-% <11> Solve for V_HP2.
-syms V_HP2sym
-Tr_HP2 = T_VCC2 ./ Tc_R134a;                             % Reduced Temerature
-ALPHASqrt2 = 1 + Kappa_R134a * (1 - sqrt(Tr_HP2));
+% 5.6.4 Status 2 of VCC_R134a.
+P_VCC2 = P_VCC3; S_VCC2 = S_VCC1;
+% <11> Solve for V_VCC2.
+syms V_VCC2sym
+Tr_VCC2 = T_VCC2 ./ Tc_R134a;                             % Reduced Temerature
+ALPHASqrt2 = 1 + Kappa_R134a * (1 - sqrt(Tr_VCC2));
 ALPHA2 = ALPHASqrt2^2;                         % Temperature-dependent parameter in PR-EOS
-aT_HP2 = aTc_R134a * ALPHA2;                          % Temperature-dependent parameter in PR-EOS (dimensions depend on equation)
-SV_HP2sym = solve(P_HP2 == R*T_VCC2 / (V_HP2sym-b_R134a) - ...
-                  aT_HP2 / (V_HP2sym*(V_HP2sym+b_R134a) + b_R134a*(V_HP2sym-b_R134a)));
-V_HP2 = double(SV_HP2sym);
-V_HP2 = V_HP2(imag(V_HP2)==0);
+aT_VCC2 = aTc_R134a * ALPHA2;                          % Temperature-dependent parameter in PR-EOS (dimensions depend on equation)
+SV_VCC2sym = solve(P_VCC2 == R*T_VCC2 / (V_VCC2sym-b_R134a) - ...
+                  aT_VCC2 / (V_VCC2sym*(V_VCC2sym+b_R134a) + b_R134a*(V_VCC2sym-b_R134a)));
+V_VCC2 = double(SV_VCC2sym);
+V_VCC2 = V_VCC2(imag(V_VCC2)==0);
 %
-S_VCC2 = CoolProp.PropsSI('S', 'T', T_VCC2, 'P', P_HP2, 'R134a');
-H_VCC2 = CoolProp.PropsSI('H', 'T', T_VCC2, 'P', P_HP2, 'R134a');
-% Input work of compressor Wi_HPp.
-Wi_HPp = M_VCC * (H_VCC2 - H_VCC1);
-%% 6. Economic Model ------------------------------------------------------------------------------------
-%% 6.1 Economic Model of MGT.
-ETA_t = Wp_MGT ./ (m_f * LHV);                             % Thermo Efficiency of MGT
-P = A_MGT + B_MGT * log(Wp_MGT/1000) + C_MGT * exp(ETA_t); % 单位功率价格, P = 0.9;
-z_MT = P * Wp_MGT / 1000;                                  % 燃气轮机的购置费
-Q_HRSG = (h_9 - h_8) * Ms_MGT;                                % 余热锅炉热负荷
-% z_HRSG = z_w * (Q_HRSG ./ Q_w)^AlphaC_MGT;                    % 余热锅炉购置费 ???
-z_HRSG = (Q_HRSG * 4.851)^AlphaC_MGT;                           % 余热锅炉购置费
-C_E_MGT = Wp_MGT * ETA_G * Z_E * N * N_y * 1000;           % Profit from Electricity generated by MGT.
-
-%% 6.2 Economic Model of AC_ALB. ---------------------------------------------------------------------------
-% Area of heat exchanger in solution heat exchanger A_ACs in AC_ALB.
-Q_ACs = M_AC2 * (h_AC3 - h_AC2);
-DeltaT_ACs = ((T_AC4 - T_AC3) - (T_AC5 - T_AC2)) / log((T_AC4 - T_AC3) / (T_AC5 - T_AC2));
-A_ACs = Q_ACs / (DeltaT_ACs * K);
-Ca_ACs = Z_A * A_ACs;
-% Area of heat exchanger in condenser A_ACc in AC_ALB.
-Q_c = M_AC7 * (h_AC7 - h_AC8);                             % W, HT Rate of heat exchanger in desorber
-T_AC15 = T_0;
-T_AC16 = T_0H;
-DeltaT_ACc = ((T_AC7 - T_AC16) - (T_AC8 - T_AC15)) / log((T_AC7 - T_AC16) / (T_AC8 - T_AC15));
-A_c = Q_c / DeltaT_ACc / K;
-h_AC15 = CoolProp.PropsSI('H', 'T', T_AC15, 'P', p_0, 'Water');
-h_AC16 = CoolProp.PropsSI('H', 'T', T_AC16, 'P', p_0, 'Water');
-m_c = Q_c / (h_AC16 - h_AC15);
-C_Ac = Z_A * A_c;
-C_Wc = Z_W * m_c * N * N_y * 3600;
-% Calculate the h, s, E_ph of water in status 18.
-h_AC18 = CoolProp.PropsSI('H', 'T', T_AC18, 'P', p_AC18, 'Water');
-s_AC18 = CoolProp.PropsSI('S', 'T', T_AC18, 'P', p_AC18, 'Water');
-ex_AC18 = (h_g18 - h_w0) - T_0 * (s_g18 - s_w0);
-E_ACe = Q_e * (T_0/T_AC18 - 1);
-PhiEx_ACe = E_ACe * Mcw_AC / (ex_AC9 * M_AC9 + ex_AC17 * Mcw_AC);                 % ???
-C_Ae = Z_A * A_e;
-% Area of heat exchanger in absorber A_ACa in AC_ALB.
-Q_ACa = M_AC10 * h_AC10 + M_AC6 * h_AC6 - M_AC1 * h_AC1; % W, HT rate of heat exchanger in desorber
-T_AC13 = T_0;
-T_AC14 = T_0H;
-DeltaT_ACa = ((T_AC6 - T_AC14) - (T_AC1 - T_AC13)) / log((T_AC6 - T_AC14) / (T_AC1 - T_AC13));
-A_ACa = Q_ACa / DeltaT_ACa / K;
-h_AC13 = CoolProp.PropsSI('H', 'T', T_AC13, 'P', p_0, 'Water');
-h_AC14 = CoolProp.PropsSI('H', 'T', T_AC14, 'P', p_0, 'Water');
-m_ACa = Q_ACa / (h_AC14 - h_AC13);
-C_ACa = Z_A * A_ACa;
-Cw_ACa = Z_W * m_ACa * N * N_y * 3600;
-W_ACa = M_AC1 * (h_AC2 - h_AC1);                        % W,   Electricity required for pump.
-Ce_ACa = Z_E * W_ACa * N * N_y * 1000;                    % RMB, Cost of electricity required for pump.
-z_AC = Q_ACe * (Q_wAC / Z_wAC)^ALPHA_wAC;                 % RMB, Estimated purchased price of AC_ALB.
-%% 6.3 Economic Model of ORC_R123. -----------------------------------------------------------------------
-% Area of Heat Exchange in Condenser within ORC_R123.
-T_ORC21 = T_0;
-T_ORC22 = T_0H;
-Q_ORC2 = M_ORC * (h_ORC4 - h_ORC1);
-DELTA_T_ORC2 = ((T_ORC4 - T_ORC22) - (T_ORC1 - T_ORC21)) / log((T_ORC4 - T_ORC22) / (T_ORC1 - T_ORC21));
-A_ORC2 = Q_ORC2 / DELTA_T_ORC2 / K;
-h_ORC21 = CoolProp.PropsSI('H', 'T', T_ORC21, 'P', p_0, 'Water');
-h_ORC22 = CoolProp.PropsSI('H', 'T', T_ORC22, 'P', p_0, 'Water');
-m_ORC2 = Q_ORC2 / (h_ORC22 - h_ORC21);                   % kg/s, Amount of supplying cooling water.
-W_ORC = M_ORC * (h_ORC3 - h_ORC4);                       % W,    Output work of ORC_R123.
-C_E_ORC = W_ORC * ETA_G * Z_E * N * N_y * 1000;          % RMB,  Profit of output work of ORC_R123.
-W_ORCp = M_ORC * (h_ORC2 - h_ORC1);                      % W,    Required Work of Pump in ORC_R123.
-C_EpORC = Z_E * W_ORCp * N * N_y * 1000;                 % RMB,  Cost of required Work of Pump in ORC_R123.
-C_ORC1 = A_ORC1 * Z_A;                                   % RMB,  Cost of area for heat exchange in evaporator.
-C_ORC2 = A_ORC2 * Z_A;                                   % RMB,  Cost of area for heat exchange in evaporator.
-C_ORCw = m_ORC2 * Z_W;                                   % RMB,  Cost of supplying cooling water.
-z_ORC = Z_wORC * (W_ORC / Q_wORC)^ALPHA_wORC;            % RMB,  Non-energy cost of ORC_R123. ??????
-PhiEx_ORC = W_ORC / ((ex_ph3 - ex_ph4) * M_ORC);
-%% 6.4 Economic Model of HP_R410a.
-% Area of heat exchange in condenser A_HPc.
-Q_HPc = M_HP * (h_HP2 - h_HP3);  % W, HT Rate in desorber
-Ms_HP = Q_HPc / (h_9 - h_0);
-DeltaT_HPc == ((T_HP2 - T_9) - (T_HP3 - T_0)) ...
-                / log((T_HP2 - T_9) / (T_HP3 - T_0));
-A_HPc = Q_HPc / DeltaT_HPc / K;
-% Area of heat exchange in evaporator A_HPe.
-Q_HPe = M_HP * (h_HP1 - h_HP4);
-DeltaT_HPe == ((T_0 - T_HP1) - (T_0L - T_HP4)) ...
-                / log((T_0 - T_HP1) / (T_0L - T_HP4));
-A_HPe = Q_HPe / DeltaT_HPe / K;
-%% 4. 经济模型 ---------------------------------------------------------------
-% Area of heat exchange in condenser Q_VCCc
-Q_VCCc = M_VCC * (H_VCC2 - H_VCC3);                        % W, HT Rate in desorber
-Mcw_VCC = Q_VCCc / (h_0H - h_0);
-DeltaT_VCCc == ((T_VCC2 - T_0H) - (T_VCC3 - T_0)) ...
-                / log((T_VCC2 - T_0H) / (T_VCC3 - T_0));
+S_VCC2 = CoolProp.PropsSI('S', 'T', T_VCC2, 'P', P_VCC2, 'R134a');
+H_VCC2 = CoolProp.PropsSI('H', 'T', T_VCC2, 'P', P_VCC2, 'R134a');
+% Input work of compressor Wi_VCCp.
+Wi_VCCp = M_VCC * (H_VCC2 - H_VCC1);
+%% Exergy Analysis of VCC_R410a.
+% Exergy damage in pump of VCC_R410a.
+We_VCCp = M_VCC * (h_VCC2 - h_VCC1);
+Ed_VCCp = (E_VCC1 * M_VCC + We_VCCp) - E_VCC2 * M_VCC;
+% Exergy damage in condenser of VCC_R410a.
+Q_VCCc = M_VCC * (h_VCC2 - h_VCC3);  % W, HT Rate in desorber
+Ms_VCCc = Q_VCCc / (h_9 - h_0);
+DeltaT_VCCc = ((T_VCC2 - T_9) - (T_VCC3 - T_0)) ...
+              / log((T_VCC2 - T_9) / (T_VCC3 - T_0));
 A_VCCc = Q_VCCc / DeltaT_VCCc / K;
-% Area of heat exchange in evaporator Q_VCCe
-Q_VCCe = M_VCC * (H_VCC1 - H_VCC4);
-m_VCCcw = Q_VCCc / (h_0 - h_cw);
-DeltaT_VCCc == ((T_0 - T_VCC1) - (T_cw - T_VCC4)) ...
-                / log((T_0 - T_VCC1) / (T_cw - T_VCC4));
-A_VCCe = Q_VCCe / DeltaT_VCCc / K;
+Ed_VCCc = (E_VCC2 * M_VCC + E_w0 * Ms_VCCc) - (E_VCC3 * M_VCC + E_s * Ms_VCC);
+% Area of heat exchange in evaporator A_VCCe.
+Q_VCCe = M_VCC * (h_VCC1 - h_VCC4);
+M_VCCe = Q_VCCe / (h_w0 - h_w0L);
+DeltaT_VCCe = ((T_0 - T_VCC1) - (T_0L - T_VCC4)) ...
+              / log((T_0 - T_VCC1) / (T_0L - T_VCC4));
+A_VCCe = Q_VCCe / DeltaT_VCCe / K;
+Ed_VCCe = (E_VCC4 * M_VCC + E_w0 * M_VCCe) - (E_VCC1 * M_VCC + E_w0L * M_VCCe);
 %% 5. Define Objective Function -------------------------------------------------------------------------
+% 5.1 Exergy Objective Function
+f = 1000000000 - Ed_MGTac - Ed_MGTre - Ed_MGTcc - Ed_MGTt - Ed_MGTre - Ed_MGThrsg + ...
+    1000000000 - Ed_ACa - Ed_ACd - Ed_ACe - Ed_ACc - Ed_ACs - Ed_ACp + ...
+    1000000000 - Ed_ORCc - Ed_ORCe - Ed_ORCp - Ed_ORCt;
+    1000000000 - Ed_HPc - Ed_HPe - Ed_HPp;
+    1000000000 - Ed_VCCc - Ed_VCCe - Ed_VCCp;
+% 5.2 Thermo-economic Objective Function
+%{
 f = 1000000 - Z_f * m_f * LHV - CRF * PhiM * (z_MT + z_HRSG) / (3600 * N) + C_E_MGT + ... % MGT Objective
-    500000 - CRF * PhiM * z_AC / (3600 * N) + ...                                    % AC_ALB Objective 1
-    500000 - (Ca_ACs + Ca_ACd + Cw_ACc + Ca_ACc + Cw_ACa + Ca_ACa) - Ce_ACa + C_Ce + ...          % AC_ALB Objective 2
-    500000 - CRF * PhiM * z_ORC / (3600 * N) + ...                                 % ORC_R123 Objective 1
-    500000 - (C_ORC1 + C_ORC2 + C_ORCw + C_EpORC) + C_E_ORC;                      % ORC_R123 Objective 2
+    500000 - CRF * PhiM * z_AC / (3600 * N) + ...                                         % AC_ALB Objective 1
+    500000 - (Ca_ACs + Ca_ACd + Cw_ACc + Ca_ACc + Cw_ACa + Ca_ACa) - Ce_ACa + C_Ce + ...  % AC_ALB Objective 2
+    500000 - CRF * PhiM * z_ORC / (3600 * N) + ...                                        % ORC_R123 Objective 1
+    500000 - (C_ORC1 + C_ORC2 + C_ORCw + C_EpORC) + C_E_ORC;                              % ORC_R123 Objective 2
+%}
 %% Plot the result of exergy analysis.
 % Plot the bar chart of exergy efficiency of equipments in MGT.
 BAR_MGTxE = categorical({'PhiEx_C_C','PhiEx_G_T','PhiEx_A_C','PhiEx_R_E','PhiEx_H_R_S_G', ...
-                        'PhiEx_ACd','PhiEx_ACe','PhiEx_ORC1','PhiEx_ORC'});
-BAR_MGTyE = [PhiEx_CC, PhiEx_GT, PhiEx_AC, PhiEx_RE, PhiEx_HRSG, PhiEx_ACd, PhiEx_ACe, PhiEx_ORC1, PhiEx_ORC];
+                        'PhiE_MGTacd','PhiE_MGTace','PhiEx_ORC1','PhiEx_ORC'});
+BAR_MGTyE = [PhiE_MGTcc, PhiE_MGTt, PhiE_MGTac, PhiE_MGTre, PhiE_MGThrsg, PhiE_MGTacd, PhiE_MGTace, PhiEx_ORC1, PhiEx_ORC];
 BAR_MGT = bar(BAR_MGTxE, BAR_MGTyE, 0.5);
 ylim([0 1.1]);
 title('绿色能源岛各组分㶲效率条形图 Bar Chart of Exergy Efficiency of GEI', ...
