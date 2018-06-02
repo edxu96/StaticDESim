@@ -92,7 +92,7 @@ OMEGA_R123 = 0.281922497036;                      % Acentric Factor, R123.
 KAPPA_R123 = 0.37464 + (1.54226 - ...             % Dependent on OMEGA(working substance),
         0.26992 * OMEGA_R123) * OMEGA_R123;       % Temp-independent parameter in PR-EOS
 aTc_R123 = 0.457235529 * (Rg_R123 * ...
-           Tc_R123)^2 ./ Pc_R123;                 % Critical Point Restriction "a(T_c)"
+           Tc_R123)^2 ./ Pc_R123;                 % Critical Point Restriction "a(Tc_R123)"
 b_R123 = 0.077796074 * Rg_R123 * ...              % m^3/mol, Critical Point Restriction "b",
          Tc_R123 ./ Pc_R123;                      % Temp-independent parameter in PR-EOS
 Q_wORC = 23.6 * 1000;                             % W,   ????
@@ -118,8 +118,8 @@ DeltaP_HPe = 100 * 1000;                      % Pa, Pressure drop in evaporator.
 Omega_R410a = 0.296;                          % Acentric Factor.
 Kappa_R410a = 0.37464 + ...                   % Dependent on Omega_R410a(working substance),
         (1.54226 - 0.26992 * Omega_R410a) * Omega_R410a;  % Temperature-independent parameter in PR-EOS
-aTc_R410a = 0.457235529 * (R_gR410 * Tc_R140a)^2 ./ p_c;  % Critical Point Restriction "a(Tc_R140a)"
-b_R410a = 0.077796074 * R_gR410 * Tc_R140a ./ p_c;        % m^3/mol, Critical Point Restriction "b_R410a",
+aTc_R410a = 0.457235529 * (Rg_R410a * Tc_R410a)^2 ./ Pc_R410a;  % Critical Point Restriction "a(Tc_R140a)"
+b_R410a = 0.077796074 * Rg_R410a * Tc_R410a ./ Pc_R410a;        % m^3/mol, Critical Point Restriction "b_R410a",
                                                           % Temperature-independent parameter in PR-EOS
 %% 1.5 Constants for VCC_R134a.
 R = 8.314472;                % J/(mol*K), Universial Gas Constant
@@ -144,6 +144,7 @@ b_R134a = 0.077796074 * Rg_R134a * Tc_R134a ./ Pc_R134a;           % m^3/mol, Cr
                                               % Temperature-independent parameter in PR-EOS
 %% 3. Pre-defined Condition. ----------------------------------------------------------------------------
 p_s = 500 * 1000;                                 % Pa, Pressure of supplying steam.
+T_s = CoolProp.PropsSI('T', 'P', p_s, 'Q', 1, 'Water');
 T_cw = 4 + 273.15; p_cw = p_0;                    % Supplying cooling water.
   Ms = 100000;
  Mcw = 100000;
@@ -446,13 +447,13 @@ T_AC18 = 5 + 273.15;
 syms Mcw_ACe A_ACe DeltaT_ACe
 eq_ACe(1) = DeltaT_ACe == ((T_AC17 - T_AC10) - (T_AC18 - T_AC9)) ...
                         / log((T_AC17 - T_AC10) / (T_AC18 - T_AC9));
-eq_ACe(2) = Q_ACe == DELTA_T_e * K * A_ACe;
+eq_ACe(2) = Q_ACe == DeltaT_ACe * K * A_ACe;
 eq_ACe(3) = Q_ACe == c_pw * Mcw_ACe * (T_AC17 - T_AC18);
-[SMcw_ACe, SA_e, SDeltaT_ACe] = solve(eq_ACe);
-  Mcw_ACe = double(SMcw_ACe);
+[SMcw_ACe, SA_ACe, SDeltaT_ACe] = solve(eq_ACe);
+ Mcw_ACe = double(SMcw_ACe);
    A_ACe = double(SA_ACe);
 DeltaT_e = double(SDeltaT_ACe);
-Ed_ACe = (E_AC9 * M_AC9 + E_w0 * Mcw_ACe) - (E_AC10 * M_AC10 + E_cw * M_cwACe);
+Ed_ACe = (E_AC9 * M_AC9 + E_w0 * Mcw_ACe) - (E_AC10 * M_AC10 + E_cw * Mcw_ACe);
 % 5.3.2 Exergy damage in desorber A_ACd.
 T_AC11 = T_7; p_AC11 = p_7; p_AC12 = p_AC11;          % Temp of High Temp Smoke from MGT.
 h_AC11 = h_g7; s_AC11 = h_g7; E_AC11 = ex_ph7;
@@ -725,8 +726,8 @@ SV_VCC1sym = solve(P_VCC1 == R*T_VCC1 / (V_VCC1sym-b_R134a) - ...
 V_VCC1 = double(SV_VCC1sym);
 V_VCC1 = V_VCC1(imag(V_VCC1)==0);
 %
-S_VCC1 = CoolProp.PropsSI('S', 'T', T_VCC1, 'Q', 1, 'R123');
-H_VCC1 = CoolProp.PropsSI('H', 'T', T_VCC1, 'Q', 1, 'R123');
+S_VCC1 = CoolProp.PropsSI('S', 'T', T_VCC1, 'Q', 1, 'R134a');
+H_VCC1 = CoolProp.PropsSI('H', 'T', T_VCC1, 'Q', 1, 'R134a');
 % 5.6.2 Status 4 of VCC_R134a.
 P_VCC4 = P_VCC1; T_VCC4 = T_VCC1;
 % <5> Solve for V_VCC4.
@@ -740,8 +741,8 @@ SV_VCC4sym = solve(P_VCC4 == R*T_VCC4 / (V_VCC4sym-b_R134a) - ...
 V_VCC4 = double(SV_VCC4sym);
 V_VCC4 = V_VCC4(imag(V_VCC4)==0);
 %
-S_VCC4 = CoolProp.PropsSI('S', 'T', T_VCC4, 'P', P_VCC4, 'R123');
-H_VCC4 = CoolProp.PropsSI('H', 'T', T_VCC4, 'P', P_VCC4, 'R123');
+S_VCC4 = CoolProp.PropsSI('S', 'T', T_VCC4, 'P', P_VCC4, 'R134a');
+H_VCC4 = CoolProp.PropsSI('H', 'T', T_VCC4, 'P', P_VCC4, 'R134a');
 % 5.6.3 Status 3 of VCC_R134a.
 % <8> solve V_VCC3 through Equation for Density of the Saturated Liquid.
 Af =  5.281464E2; Bf =  7.551834E2; Cf = 1.028676E3;
