@@ -1,7 +1,7 @@
 % Title: Thermo-economic Optimization of Distributed Energy System in Green Energy Island.
 % Based on the theory of nolinear equality and inequality constraints.
 % Method: Genetic Algorithm within MATLAB Global Optimization Toolbox.
-% Version: 1.0, 2018.5.28, Jie Xu.
+% Version: 1.1, 2018.6.2, Jie Xu.
 % SubTitle: Calculate and the result of GEI optim, then exergy analysis.
 % 1. Micro Gas Turbine (MGT)
 % 2. Aqueous Lithium-Bromine Single-Effect Absorption Chiller (AC_ALB)
